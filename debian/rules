@@ -20,6 +20,26 @@ export DH_OPTIONS
 %:
 	dh $@
 
+build:
+	dh_testdir
+	dh_auto_configure
+	dh_auto_build
+	dh_auto_test
+	mkdir -p debian/manpages-tmp/
+	cp man/shinken-arbiter.8shinken     debian/manpages-tmp/shinken-arbiter.8
+	cp man/shinken-broker.8shinken      debian/manpages-tmp/shinken-broker.8
+	cp man/shinken-discovery.8shinken   debian/manpages-tmp/shinken-discovery.8
+	cp man/shinken-poller.8shinken      debian/manpages-tmp/shinken-poller.8
+	cp man/shinken-reactionner.8shinken debian/manpages-tmp/shinken-reactionner.8
+	cp man/shinken-receiver.8shinken    debian/manpages-tmp/shinken-receiver.8
+	cp man/shinken-scheduler.8shinken   debian/manpages-tmp/shinken-scheduler.8
+	sed -r -i -e '3s/Command/shinken-arbiter/'     -e '1s/SHINKEN-([A-Z]+)/NAME/'  debian/manpages-tmp/shinken-arbiter.8
+	sed -r -i -e '3s/Command/shinken-broker/'      -e '1s/SHINKEN-([A-Z]+)/NAME/'  debian/manpages-tmp/shinken-broker.8
+	sed -r -i -e '3s/Command/shinken-discovery/'   -e '1s/SHINKEN-([A-Z]+)/NAME/'  debian/manpages-tmp/shinken-discovery.8
+	sed -r -i -e '3s/Command/shinken-poller/'      -e '1s/SHINKEN-([A-Z]+)/NAME/'  debian/manpages-tmp/shinken-poller.8
+	sed -r -i -e '3s/Command/shinken-reactionner/' -e '1s/SHINKEN-([A-Z]+)/NAME/'  debian/manpages-tmp/shinken-reactionner.8
+	sed -r -i -e '3s/Command/shinken-receiver/'    -e '1s/SHINKEN-([A-Z]+)/NAME/'  debian/manpages-tmp/shinken-receiver.8
+	sed -r -i -e '3s/Command/shinken-scheduler/'   -e '1s/SHINKEN-([A-Z]+)/NAME/'  debian/manpages-tmp/shinken-scheduler.8
 
 binary: 
 	dh_testroot
