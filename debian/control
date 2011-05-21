@@ -5,7 +5,7 @@ Section: net
 Priority: optional
 Maintainer: Arthur Gautier <superbaloo+debian@superbaloo.net>
 Build-Depends: debhelper (>= 7.0.50~)
-Standards-Version: 3.9.1
+Standards-Version: 3.9.2
 Homepage: http://www.shinken-monitoring.org/
 #Vcs-Git: git://git.debian.org/collab-maint/shinken.git
 #Vcs-Browser: http://git.debian.org/?p=collab-maint/shinken.git;a=summary
