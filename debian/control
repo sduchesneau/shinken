@@ -1,0 +1,22 @@
+Source: shinken
+Section: net
+Priority: optional
+Maintainer: Arthur Gautier <superbaloo+debian@superbaloo.net>
+Build-Depends: debhelper (>= 7.0.50~)
+Standards-Version: 3.9.1
+Homepage: http://www.shinken-monitoring.org/
+#Vcs-Git: git://git.debian.org/collab-maint/shinken.git
+#Vcs-Browser: http://git.debian.org/?p=collab-maint/shinken.git;a=summary
+
+Package: shinken
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Flexible monitoring tool - Core
+ Shinken is a new, Nagios compatible monitoring tool, written in Python. The
+ main goal of Shinken is to allow users to have a fully flexible architecture
+ for their monitoring system that can easily scale to large environments.
+
+Package: shinken-arbiter
+Architecture: all
+Description: Flexible monitoring - Arbiter module
+ Arbiter module for shinken monitoring
