@@ -31,7 +31,7 @@ Description: Flexible monitoring - Core component
 # {{{ Arbiter module
 Package: shinken-arbiter
 Architecture: all
-Depends: shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: python (>= 2.5), shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Description: Flexible monitoring - Arbiter module
  Arbiter module for shinken monitoring
  Shinken is a new, Nagios compatible monitoring tool, written in Python. The
@@ -42,7 +42,7 @@ Description: Flexible monitoring - Arbiter module
 # {{{ Broker module
 Package: shinken-broker
 Architecture: all
-Depends: shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: python (>= 2.5), shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Description: Flexible monitoring - Broker module
  Broker module for shinken monitoring
  Shinken is a new, Nagios compatible monitoring tool, written in Python. The
@@ -53,7 +53,7 @@ Description: Flexible monitoring - Broker module
 # {{{ Discovery module
 Package: shinken-discovery
 Architecture: all
-Depends: shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: python (>= 2.5), shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Description: Flexible monitoring - Discovery module
  Discovery module for shinken monitoring
  Shinken is a new, Nagios compatible monitoring tool, written in Python. The
@@ -64,7 +64,7 @@ Description: Flexible monitoring - Discovery module
 # {{{ Poller module
 Package: shinken-poller
 Architecture: all
-Depends: shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: python (>= 2.5), shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Description: Flexible monitoring - Poller module
  Poller module for shinken monitoring
  Shinken is a new, Nagios compatible monitoring tool, written in Python. The
@@ -75,7 +75,7 @@ Description: Flexible monitoring - Poller module
 # {{{ Receiver module
 Package: shinken-receiver
 Architecture: all
-Depends: shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: python (>= 2.5), shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Description: Flexible monitoring - Receiver module
  Receiver module for shinken monitoring
  Shinken is a new, Nagios compatible monitoring tool, written in Python. The
@@ -86,7 +86,7 @@ Description: Flexible monitoring - Receiver module
 # {{{ Scheduler module
 Package: shinken-scheduler
 Architecture: all
-Depends: shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: python (>= 2.5), shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Description: Flexible monitoring - Scheduler module
  Scheduler module for shinken monitoring
  Shinken is a new, Nagios compatible monitoring tool, written in Python. The
