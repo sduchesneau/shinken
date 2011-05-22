@@ -15,3 +15,4 @@ debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/service_perfdata_brok
 
 debian/tmp/usr/bin/shinken-broker                                                              /usr/bin
 
+debian/tmp/etc/init.d/shinken-broker                                                           /etc/init.d/

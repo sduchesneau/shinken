@@ -9,3 +9,4 @@ debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/hot_dependencies_arbi
 
 debian/tmp/usr/bin/shinken-arbiter                                                             /usr/bin
 
+debian/tmp/etc/init.d/shinken-arbiter                                                          /etc/init.d/

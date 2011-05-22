@@ -8,3 +8,4 @@ debian/tmp/usr/lib/python2.6/dist-packages/shinken/daemons/schedulerdaemon.py   
 
 debian/tmp/usr/bin/shinken-scheduler                                                           /usr/bin
 
+debian/tmp/etc/init.d/shinken-scheduler                                                        /etc/init.d/

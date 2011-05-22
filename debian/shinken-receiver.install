@@ -2,3 +2,4 @@ debian/tmp/usr/lib/python2.6/dist-packages/shinken/daemons/receiverdaemon.py    
 
 debian/tmp/usr/bin/shinken-receiver                                                            /usr/bin
 
+debian/tmp/etc/init.d/shinken-receiver                                                         /etc/init.d/
