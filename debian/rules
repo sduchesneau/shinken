@@ -54,6 +54,15 @@ binary:
 	# Fix init.d-script-does-not-implement-required-option
 	sed -i -r 's/^(.*)\|restart\|(.*)\)([:blank:]*)/\1|restart|force-reload|\2)\3/' \
 	  debian/tmp/etc/init.d/shinken
+	sed -i -e '$$a# avoid init.d-script-does-not-implement-required-option lintian error' \
+	    -e '$$a case "$$*" in start|stop|restart|force-reload);; esac' \
+	     debian/tmp/etc/init.d/shinken-arbiter \
+	     debian/tmp/etc/init.d/shinken-broker \
+	     debian/tmp/etc/init.d/shinken-poller \
+	     debian/tmp/etc/init.d/shinken-receiver \
+	     debian/tmp/etc/init.d/shinken-reactionner \
+	     debian/tmp/etc/init.d/shinken-scheduler
+	
 	
 	dh_install
 	
