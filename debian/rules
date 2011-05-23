@@ -41,6 +41,8 @@ binary:
 	# Fix lsb tags
 	sed -i -r 's/^(# Required-Start:.*|# Required-Stop:.*)$$/\1 $$remote_fs/' \
 	  debian/tmp/etc/init.d/shinken
+	sed -i -r 's/^(# Default-Start:.*)$$/\1 S/' \
+	  debian/tmp/etc/init.d/shinken
 	sed -n -i '1h;1!H;$${;g;s/### BEGIN INIT INFO Redhat.*### END INIT INFO//g;p;}' \
 	  debian/tmp/etc/init.d/shinken-arbiter \
 	  debian/tmp/etc/init.d/shinken-broker \
