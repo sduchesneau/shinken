@@ -31,15 +31,6 @@ binary:
 	dh_prep
 	dh_installdirs
 	dh_auto_install
-	dh_install
-	
-	# creates empty var directory
-	mkdir -p --mode=755 debian/shinken-core/var/lib
-	mkdir -p --mode=750 debian/shinken-core/var/lib/shinken
-	
-	# fix permissions
-	chmod -x debian/shinken-core/etc/shinken/certs/ca.pem
-	chmod -x debian/shinken-core/etc/shinken/certs/client.pem
 	
 	# Fix debian paths
 	sed -i -r 's#/tmp/shinken-building/shinken-0.6.4/debian/tmp##' \
@@ -57,6 +48,15 @@ binary:
 	  debian/tmp/etc/init.d/shinken-receiver \
 	  debian/tmp/etc/init.d/shinken-reactionner \
 	  debian/tmp/etc/init.d/shinken-scheduler
+		dh_install
+	
+	# creates empty var directory
+	mkdir -p --mode=755 debian/shinken-core/var/lib
+	mkdir -p --mode=750 debian/shinken-core/var/lib/shinken
+	
+	# fix permissions
+	chmod -x debian/shinken-core/etc/shinken/certs/ca.pem
+	chmod -x debian/shinken-core/etc/shinken/certs/client.pem
 	
 	dh_installdocs
 	dh_installchangelogs
