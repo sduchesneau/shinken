@@ -41,7 +41,7 @@ binary:
 	# Fix lsb tags
 	sed -i -r 's/^(# Required-Start:.*|# Required-Stop:.*)$$/\1 $$remote_fs/' \
 	  debian/tmp/etc/init.d/shinken
-	sed -i -r 's/^(# Default-Start:.*)$$/\1 S/' \
+	sed -i -r 's/(# Default-Stop:.*)S (.*)/\1\2/' \
 	  debian/tmp/etc/init.d/shinken
 	sed -n -i '1h;1!H;$${;g;s/### BEGIN INIT INFO Redhat.*### END INIT INFO//g;p;}' \
 	  debian/tmp/etc/init.d/shinken-arbiter \
@@ -50,7 +50,12 @@ binary:
 	  debian/tmp/etc/init.d/shinken-receiver \
 	  debian/tmp/etc/init.d/shinken-reactionner \
 	  debian/tmp/etc/init.d/shinken-scheduler
-		dh_install
+	
+	# Fix init.d-script-does-not-implement-required-option
+	sed -i -r 's/^(.*)\|restart\|(.*)\)([:blank:]*)/\1|restart|force-reload|\2)\3/' \
+	  debian/tmp/etc/init.d/shinken
+	
+	dh_install
 	
 	# creates empty var directory
 	mkdir -p --mode=755 debian/shinken-core/var/lib
