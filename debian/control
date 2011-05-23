@@ -12,7 +12,7 @@ Homepage: http://www.shinken-monitoring.org/
 
 Package: shinken
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: shinken-arbiter (= ${source:Version}), shinken-broker (= ${source:Version}), shinken-discovery (= ${source:Version}), shinken-poller (= ${source:Version}), shinken-reactionner (= ${source:Version}), shinken-receiver (= ${source:Version}), shinken-scheduler (= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
 Description: Flexible monitoring tool - Meta-package
  This package installs all components for shinken.
  Shinken is a new, Nagios compatible monitoring tool, written in Python. The
