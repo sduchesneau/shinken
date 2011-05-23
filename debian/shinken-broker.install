@@ -16,3 +16,7 @@ debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/service_perfdata_brok
 debian/tmp/usr/bin/shinken-broker                                                              /usr/bin
 
 debian/tmp/etc/init.d/shinken-broker                                                           /etc/init.d/
+
+db/merlin_db_mysql.sql.gz                                                                      /usr/share/doc/shinken-broker/sql/
+db/merlin_db_sqlite.sql.gz                                                                     /usr/share/doc/shinken-broker/sql/
+db/ndo_db_oracle.sql.gz                                                                        /usr/share/doc/shinken-broker/sql/
