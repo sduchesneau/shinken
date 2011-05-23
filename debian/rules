@@ -47,6 +47,22 @@ binary:
 	  debian/tmp/etc/shinken/*.cfg \
 	  debian/tmp/etc/default/shinken
 	
+	# Fix lsb tags
+	sed -i -r 's/^(# Required-Start:.*|# Required-Stop:.*)$/\1 $remote_fs/' \
+	  debian/tmp/etc/init.d/shinken
+	sed -n '1h
+	  1!H
+	  $ {
+	    g
+	    s/### BEGIN INIT INFO Redhat.*### END INIT INFO//g
+	    p
+	  }' debian/tmp/etc/init.d/shinken-arbiter \
+	     debian/tmp/etc/init.d/shinken-broker \
+	     debian/tmp/etc/init.d/shinken-poller \
+	     debian/tmp/etc/init.d/shinken-receiver \
+	     debian/tmp/etc/init.d/shinken-reactionner \
+	     debian/tmp/etc/init.d/shinken-scheduler
+	
 	dh_installdocs
 	dh_installchangelogs
 	dh_installexamples
