@@ -72,6 +72,17 @@ Description: Flexible monitoring - Poller module
  for their monitoring system that can easily scale to large environments.
 # }}}
 
+# {{{ Reactionner module
+Package: shinken-reactionner
+Architecture: all
+Depends: python (>= 2.5), shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: Flexible monitoring - Reactionner module
+ Reactionner module for shinken monitoring
+ Shinken is a new, Nagios compatible monitoring tool, written in Python. The
+ main goal of Shinken is to allow users to have a fully flexible architecture
+ for their monitoring system that can easily scale to large environments.
+# }}}
+
 # {{{ Receiver module
 Package: shinken-receiver
 Architecture: all
