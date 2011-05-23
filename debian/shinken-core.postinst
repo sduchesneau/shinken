@@ -30,9 +30,9 @@ case "$1" in
       adduser --ingroup shinken --no-create-home --system --home /var/lib/shinken shinken
 
     ## need to have postfix in the right group, but old revs do it wrong..$
-    if [ "$(id -gn shinken)" != "shinken" ]; then$
+    if [ "$(id -gn shinken)" != "shinken" ]; then
         usermod -g shinken shinken
-    fi$
+    fi
 
     ## No need anymore temporary vars
     rm -rf $TMP
