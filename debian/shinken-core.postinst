@@ -39,8 +39,10 @@ case "$1" in
     unset TMP
 
     ## Checks rights
-    dpkg-statoverride --remove /var/lib/shinken/ >/dev/null 2>&1 || true
-    dpkg-statoverride --update --add shinken shinken 02750 /var/lib/shinken/ >/dev/null 2>&1 || true
+    dpkg-statoverride --remove /var/run/shinken/ >/dev/null 2>&1 || true
+    dpkg-statoverride --update --add shinken shinken 02750 /var/run/shinken/ >/dev/null 2>&1 || true
+    dpkg-statoverride --remove /var/log/shinken/ >/dev/null 2>&1 || true
+    dpkg-statoverride --update --add shinken shinken 02750 /var/log/shinken/ >/dev/null 2>&1 || true
 
     ## Ensure shinken starts automatically
     update-rc.d shinken defaults >/dev/null
