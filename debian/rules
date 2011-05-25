@@ -70,10 +70,6 @@ binary:
 	mkdir -p --mode=755 debian/shinken-core/var/lib
 	mkdir -p --mode=750 debian/shinken-core/var/lib/shinken
 	
-	# fix permissions
-	chmod -x debian/shinken-core/etc/shinken/certs/ca.pem
-	chmod -x debian/shinken-core/etc/shinken/certs/client.pem
-	
 	dh_installdocs
 	dh_installchangelogs
 	dh_installexamples

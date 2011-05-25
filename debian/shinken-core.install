@@ -63,7 +63,8 @@ debian/tmp/usr/lib/python2.6/dist-packages/Shinken-0.6.egg-info                 
 debian/tmp/usr/lib/shinken                                                                     /usr/lib/
 
 debian/tmp/etc/default                                                                         /etc/
-debian/tmp/etc/shinken                                                                         /etc/
+
+debian/config-files/etc/shinken/                                                               /etc/
 
 debian/tmp/etc/init.d/shinken                                                                  /etc/init.d
 
