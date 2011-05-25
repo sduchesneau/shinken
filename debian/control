@@ -4,7 +4,7 @@ Source: shinken
 Section: net
 Priority: optional
 Maintainer: Arthur Gautier <superbaloo+debian@superbaloo.net>
-Build-Depends: debhelper (>= 7.0.50~)
+Build-Depends: debhelper (>= 7.0.50~), python (>= 2.5), python-setuptools
 Standards-Version: 3.9.2
 Homepage: http://www.shinken-monitoring.org/
 #Vcs-Git: git://git.debian.org/collab-maint/shinken.git
