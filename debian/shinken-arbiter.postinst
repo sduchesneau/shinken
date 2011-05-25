@@ -18,7 +18,7 @@ case "$1" in
     :
 
     ## Ensure shinken starts automatically
-    update-rc.d shinken-arbiter default >/dev/null
+    update-rc.d shinken-arbiter defaults >/dev/null
 
     ;;
   abort-upgrade)

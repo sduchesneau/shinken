@@ -18,7 +18,7 @@ case "$1" in
     :
 
     ## Ensure shinken starts automatically
-    update-rc.d shinken-poller default >/dev/null
+    update-rc.d shinken-poller defaults >/dev/null
 
     ;;
   abort-upgrade)

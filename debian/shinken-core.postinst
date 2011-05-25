@@ -43,7 +43,7 @@ case "$1" in
     dpkg-statoverride --update --add shinken shinken 02750 /var/lib/shinken/ >/dev/null 2>&1 || true
 
     ## Ensure shinken starts automatically
-    update-rc.d shinken default >/dev/null
+    update-rc.d shinken defaults >/dev/null
 
     ;;
   abort-upgrade)
