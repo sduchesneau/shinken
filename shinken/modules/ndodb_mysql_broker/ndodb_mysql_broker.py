@@ -62,6 +62,7 @@ class Ndodb_Mysql_broker(BaseModule):
         self.password = conf.password
         self.database = conf.database
         self.character_set = conf.character_set
+        self.nagios_mix_offset = int(conf.nagios_mix_offset)
 
 
     #Called by Broker so we can do init stuff
@@ -82,11 +83,18 @@ class Ndodb_Mysql_broker(BaseModule):
     #Get a brok, parse it, and put in in database
     #We call functions like manage_ TYPEOFBROK _brok that return us queries
     def manage_brok(self, b):
-        #We've got problem with instance_id == 0 so we add 1 every where
-        if 'instance_id' in b.data:
-            b.data['instance_id'] = b.data['instance_id'] + 1
-        #print "(Ndo) I search manager:", manager
-        queries = BaseModule.manage_brok(self, b)
+        # We need to do some brok mod, so we copy it
+        new_b = copy.deepcopy(b)
+
+        # We've got problem with instance_id == 0 so we add 1 every where
+        if 'instance_id' in new_b.data:
+            #For nagios mix install, move more than 1
+            if self.nagios_mix_offset != 0:
+                new_b.data['instance_id'] = new_b.data['instance_id'] + self.nagios_mix_offset
+            else:
+                new_b.data['instance_id'] = new_b.data['instance_id'] + 1
+
+        queries = BaseModule.manage_brok(self, new_b)
         if queries is not None:
             for q in queries :
                 self.db.execute_query(q)
@@ -152,11 +160,11 @@ class Ndodb_Mysql_broker(BaseModule):
             return row[0]
 
 
-    #Ok, we are at launch and a scheduler want him only, OK...
-    #So ca create several queries with all tables we need to delete with
-    #our instance_id
-    #This brob must be send at the begining of a scheduler session,
-    #if not, BAD THINGS MAY HAPPENED :)
+    # Ok, we are at launch and a scheduler want him only, OK...
+    # So ca create several queries with all tables we need to delete with
+    # our instance_id
+    # This brob must be send at the begining of a scheduler session,
+    # if not, BAD THINGS MAY HAPPENED :)
     def manage_clean_all_my_instance_id_brok(self, b):
         instance_id = b.data['instance_id']
         tables = ['commands', 'contacts', 'contactgroups', 'hosts',
@@ -171,7 +179,7 @@ class Ndodb_Mysql_broker(BaseModule):
             res.append(q)
 
         #We also clean cache, because we are not sure about this data now
-        print "[MySQL/NDO] Flushing caches"
+        print "[MySQL/NDO] Flushing caches (clean from instance %d)" % instance_id
         self.services_cache = {}
         self.hosts_cache = {}
 
@@ -194,7 +202,8 @@ class Ndodb_Mysql_broker(BaseModule):
         'instance_id' : new_b.data['instance_id']
         })
 
-        to_del = ['instance_name', 'command_file']
+        to_del = ['instance_name', 'command_file', 'check_external_commands', 'check_service_freshness',
+                  'check_host_freshness']
         to_add = []
         mapping = self.mapping['program_status']
         for prop in new_b.data:
@@ -219,7 +228,8 @@ class Ndodb_Mysql_broker(BaseModule):
     #TODO : fill nagios_instances
     def manage_update_program_status_brok(self, b):
         new_b = copy.deepcopy(b)
-        to_del = ['instance_name', 'command_file']
+        to_del = ['instance_name', 'command_file', 'check_external_commands', 'check_service_freshness',
+                  'check_host_freshness']
         to_add = []
         mapping = self.mapping['program_status']
         for prop in new_b.data:
@@ -269,7 +279,7 @@ class Ndodb_Mysql_broker(BaseModule):
                       'freshness_checks_enabled' : data['check_freshness'], 'freshness_threshold' : data['freshness_threshold'],
                       'passive_checks_enabled' : data['passive_checks_enabled'], 'event_handler_enabled' : data['event_handler_enabled'],
                       'active_checks_enabled' : data['active_checks_enabled'], 'notifications_enabled' : data['notifications_enabled'],
-                      'obsess_over_host' : data['obsess_over_host'], 'notes' : data['notes'], 'notes_url' : data['notes_url']
+                      'obsess_over_host' : data['obsess_over_host'], 'notes' : data['notes'], 'notes_url' : data['notes_url'],
             }
 
         #print "HOST DATA", hosts_data
@@ -288,9 +298,13 @@ class Ndodb_Mysql_broker(BaseModule):
                            'execution_time' : data['execution_time'], 'latency' : data['latency'],
                            'output' : data['output'], 'perfdata' : data['perf_data'],'last_check' : de_unixify(data['last_chk']),
                            'last_hard_state_change' :  de_unixify(data['last_hard_state_change']),
+                           'last_state_change' :  de_unixify(data['last_state_change']),
+                           'last_notification' : de_unixify(data['last_notification']),
+                           'current_notification_number' : data['current_notification_number'],
                            'problem_has_been_acknowledged' : data['problem_has_been_acknowledged'], 'acknowledgement_type' : data['acknowledgement_type'],
                            #set check to 1 so nagvis is happy
-                           'has_been_checked' : 1,
+                           'has_been_checked' : 1, 'percent_state_change' : data['percent_state_change'], 'is_flapping' : data['is_flapping'],
+                           'flap_detection_enabled' : data['flap_detection_enabled'],
                            }
         hoststatus_query = self.db.create_insert_query('hoststatus' , hoststatus_data)
 
@@ -346,9 +360,13 @@ class Ndodb_Mysql_broker(BaseModule):
                               'execution_time' : data['execution_time'], 'latency' : data['latency'],
                               'output' : data['output'], 'perfdata' : data['perf_data'], 'last_check' : de_unixify(data['last_chk']),
                               'last_hard_state_change' :  de_unixify(data['last_hard_state_change']),
+                              'last_state_change' :  de_unixify(data['last_state_change']),
+                              'last_notification' : de_unixify(data['last_notification']),
+                              'current_notification_number' : data['current_notification_number'],
                               'problem_has_been_acknowledged' : data['problem_has_been_acknowledged'], 'acknowledgement_type' : data['acknowledgement_type'],
                               #set check to 1 so nagvis is happy
-                              'has_been_checked' : 1,
+                              'has_been_checked' : 1, 'percent_state_change' : data['percent_state_change'], 'is_flapping' : data['is_flapping'],
+                              'flap_detection_enabled' : data['flap_detection_enabled'],
                               }
         servicestatus_query = self.db.create_insert_query('servicestatus' , servicestatus_data)
 
@@ -447,7 +465,8 @@ class Ndodb_Mysql_broker(BaseModule):
                            'check_type' : 0, 'current_check_attempt' : data['attempt'],
                            'current_state' : data['state_id'], 'state_type' : data['state_type_id'],
                            'execution_time' : data['execution_time'], 'latency' : data['latency'],
-                           'output' : data['output'], 'perfdata' : data['perf_data'], 'last_check' : de_unixify(data['last_chk'])
+                           'output' : data['output'], 'perfdata' : data['perf_data'], 'last_check' : de_unixify(data['last_chk']),
+                           'percent_state_change' : data['percent_state_change'],
         }
         hoststatus_query = self.db.create_update_query('hoststatus' , hoststatus_data, where_clause)
 
@@ -488,10 +507,11 @@ class Ndodb_Mysql_broker(BaseModule):
 
         #Now servicestatus
         servicestatus_data = {'instance_id' : data['instance_id'],
-                           'check_type' : 0, 'current_check_attempt' : data['attempt'],
-                           'current_state' : data['state_id'], 'state_type' : data['state_type_id'],
-                           'execution_time' : data['execution_time'], 'latency' : data['latency'],
-                           'output' : data['output'], 'perfdata' : data['perf_data'], 'last_check' : de_unixify(data['last_chk'])
+                              'check_type' : 0, 'current_check_attempt' : data['attempt'],
+                              'current_state' : data['state_id'], 'state_type' : data['state_type_id'],
+                              'execution_time' : data['execution_time'], 'latency' : data['latency'],
+                              'output' : data['output'], 'perfdata' : data['perf_data'], 'last_check' : de_unixify(data['last_chk']),
+                              'percent_state_change' : data['percent_state_change'],
         }
 
         servicestatus_query = self.db.create_update_query('servicestatus' , servicestatus_data, where_clause)
@@ -551,9 +571,13 @@ class Ndodb_Mysql_broker(BaseModule):
                            'execution_time' : data['execution_time'], 'latency' : data['latency'],
                            'output' : data['output'], 'perfdata' : data['perf_data'],'last_check' : de_unixify(data['last_chk']),
                            'last_hard_state_change' :  de_unixify(data['last_hard_state_change']),
+                           'last_state_change' :  de_unixify(data['last_state_change']),
+                           'last_notification' : de_unixify(data['last_notification']),
+                           'current_notification_number' : data['current_notification_number'],
                            'problem_has_been_acknowledged' : data['problem_has_been_acknowledged'], 'acknowledgement_type' : data['acknowledgement_type'],
                            #set check to 1 so nagvis is happy
-                           'has_been_checked' : 1,
+                           'has_been_checked' : 1, 'is_flapping' : data['is_flapping'], 'percent_state_change' : data['percent_state_change'], 
+                           'flap_detection_enabled' : data['flap_detection_enabled'],
                            }
         hoststatus_query = self.db.create_update_query('hoststatus' , hoststatus_data, where_clause)
 
@@ -600,9 +624,13 @@ class Ndodb_Mysql_broker(BaseModule):
                               'execution_time' : data['execution_time'], 'latency' : data['latency'],
                               'output' : data['output'], 'perfdata' : data['perf_data'], 'last_check' : de_unixify(data['last_chk']),
                               'last_hard_state_change' :  de_unixify(data['last_hard_state_change']),
+                              'last_state_change' :  de_unixify(data['last_state_change']),
+                              'last_notification' : de_unixify(data['last_notification']),
+                              'current_notification_number' : data['current_notification_number'],
                               'problem_has_been_acknowledged' : data['problem_has_been_acknowledged'], 'acknowledgement_type' : data['acknowledgement_type'],
                               #set check to 1 so nagvis is happy
-                              'has_been_checked' : 1,
+                              'has_been_checked' : 1, 'is_flapping' : data['is_flapping'], 'percent_state_change' : data['percent_state_change'],
+                              'flap_detection_enabled' : data['flap_detection_enabled'],
                               }
 
         where_clause = {'service_object_id' : service_id}

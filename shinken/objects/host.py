@@ -119,6 +119,7 @@ class Host(SchedulingItem):
         'poller_tag':           StringProp(default='None'),
         'reactionner_tag':           StringProp(default='None'),
         'resultmodulations':    StringProp(default=''),
+        'criticitymodulations': StringProp(default=''),
         'escalations':          StringProp(default='', fill_brok=['full_status']),
         'maintenance_period':   StringProp(default='', fill_brok=['full_status']),
 
@@ -181,7 +182,7 @@ class Host(SchedulingItem):
         'downtimes':            StringProp(default=[], fill_brok=['full_status'], retention=True),
         'comments':             StringProp(default=[], fill_brok=['full_status'], retention=True),
         'flapping_changes':     StringProp(default=[], fill_brok=['full_status'], retention=True),
-        'percent_state_change': FloatProp(default=0.0, fill_brok=['full_status'], retention=True),
+        'percent_state_change': FloatProp(default=0.0, fill_brok=['full_status', 'check_result'], retention=True),
         'problem_has_been_acknowledged': BoolProp(default=False, fill_brok=['full_status'], retention=True),
         'acknowledgement':      StringProp(default=None, retention=True),
         'acknowledgement_type': IntegerProp(default=1, fill_brok=['full_status', 'check_result'], retention=True),
@@ -239,6 +240,7 @@ class Host(SchedulingItem):
         ### Problem/impact part
         'is_problem':           StringProp(default=False, fill_brok=['full_status']),
         'is_impact':            StringProp(default=False, fill_brok=['full_status']),
+
         # the save value of our criticity for "problems"
         'my_own_criticity':     IntegerProp(default=-1),
 
@@ -266,6 +268,7 @@ class Host(SchedulingItem):
         'in_hard_unknown_reach_phase' : BoolProp(default=False, retention=True),
         'was_in_hard_unknown_reach_phase' : BoolProp(default=False, retention=True),
         'state_before_hard_unknown_reach_phase' : StringProp(default='UP', retention=True),
+
     })
 
     # Hosts macros and prop that give the information
@@ -401,23 +404,22 @@ class Host(SchedulingItem):
             logger.log("%s : My check_period is not correct" % self.get_name())
             state = False
         
-        if getattr(self, 'realm', None) is None:
-            logger.log("%s : My realm is not correct" % self.get_name())
-            state = False
         if not hasattr(self, 'check_period'):
             self.check_period = None
+
         if hasattr(self, 'host_name'):
             for c in cls.illegal_object_name_chars:
                 if c in self.host_name:
                     logger.log("%s : My host_name got the caracter %s that is not allowed." % (self.get_name(), c))
                     state = False
+
         return state
 
 
     # Search in my service if I've got the service
     def find_service_by_name(self, service_description):
         for s in self.services:
-            if s.service_description == service_description:
+            if getattr(s, 'service_description', '__UNNAMED_SERVICE__') == service_description:
                 return s
         return None
 
@@ -632,6 +634,13 @@ class Host(SchedulingItem):
         logger.log('HOST ALERT: %s;%s;%s;%d;%s' % (self.get_name(), self.state, self.state_type, self.attempt, self.output))
 
 
+    # If the configuration allow it, raise an initial log like
+    # CURRENT HOST STATE: server;DOWN;HARD;1;I don't know what to say...
+    def raise_initial_state(self):
+        if self.__class__.log_initial_states:
+            logger.log('CURRENT HOST STATE: %s;%s;%s;%d;%s' % (self.get_name(), self.state, self.state_type, self.attempt, self.output))
+
+
     # Add a log entry with a Freshness alert like:
     # Warning: The results of host 'Server' are stale by 0d 0h 0m 58s (threshold=0d 1h 0m 0s).
     # I'm forcing an immediate check of the host.
@@ -664,14 +673,14 @@ class Host(SchedulingItem):
     #Raise a log entry with FLAPPING START alert like
     #HOST FLAPPING ALERT: server;STARTED; Host appears to have started flapping (50.6% change >= 50.0% threshold)
     def raise_flapping_start_log_entry(self, change_ratio, threshold):
-        logger.log("HOST FLAPPING ALERT: %s;STARTED; Host appears to have started flapping (%.1f% change >= %.1% threshold)" % \
+        logger.log("HOST FLAPPING ALERT: %s;STARTED; Host appears to have started flapping (%.1f%% change >= %.1f%% threshold)" % \
                       (self.get_name(), change_ratio, threshold))
 
 
     #Raise a log entry with FLAPPING STOP alert like
     #HOST FLAPPING ALERT: server;STOPPED; host appears to have stopped flapping (23.0% change < 25.0% threshold)
     def raise_flapping_stop_log_entry(self, change_ratio, threshold):
-        logger.log("HOST FLAPPING ALERT: %s;STOPPED; Host appears to have stopped flapping (%.1f% change < %.1% threshold)" % \
+        logger.log("HOST FLAPPING ALERT: %s;STOPPED; Host appears to have stopped flapping (%.1f%% change < %.1f%% threshold)" % \
                       (self.get_name(), change_ratio, threshold))
 
 
@@ -924,7 +933,7 @@ class Hosts(Items):
     # hosts -> hosts (parents, etc)
     # hosts -> commands (check_command)
     # hosts -> contacts
-    def linkify(self, timeperiods=None, commands=None, contacts=None, realms=None, resultmodulations=None, escalations=None, hostgroups=None):
+    def linkify(self, timeperiods=None, commands=None, contacts=None, realms=None, resultmodulations=None, criticitymodulations=None, escalations=None, hostgroups=None):
         self.linkify_with_timeperiods(timeperiods, 'notification_period')
         self.linkify_with_timeperiods(timeperiods, 'check_period')
         self.linkify_with_timeperiods(timeperiods, 'maintenance_period')
@@ -936,6 +945,7 @@ class Hosts(Items):
         self.linkify_with_contacts(contacts)
         self.linkify_h_by_realms(realms)
         self.linkify_with_resultmodulations(resultmodulations)
+        self.linkify_with_criticitymodulations(criticitymodulations)
         # WARNING: all escalations will not be link here
         # (just the escalation here, not serviceesca or hostesca).
         # This last one will be link in escalations linkify.
@@ -973,19 +983,15 @@ class Hosts(Items):
         for r in realms:
             if getattr(r, 'default', False):
                 default_realm = r
-        if default_realm is None:
-            print "Error : there is no default realm defined!"
+        #if default_realm is None:
+        #    print "Error : there is no default realm defined!"
         for h in self:
-            #print h.get_name(), h.realm
             if h.realm is not None:
                 p = realms.find_by_name(h.realm.strip())
-                if p is not None:
-                    h.realm = p
-                    print "Host", h.get_name(), "is in the realm", p.get_name()
-                else:
+                if p is None:
                     err = "Error : the host %s got a invalid realm (%s)!" % (h.get_name(), h.realm)
                     h.configuration_errors.append(err)
-                    h.realm = None
+                h.realm = p
             else:
                 #print "Notice : applying default realm %s to host %s" % (default_realm.get_name(), h.get_name())
                 h.realm = default_realm

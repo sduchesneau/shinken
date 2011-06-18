@@ -621,10 +621,6 @@ ResponseHeader: fixed16
         #---------------------------------------------------------------
         # get the full hosts table
         #---------------------------------------------------------------
-        request = 'GET status\nColumns: livestatus_version program_version accept_passive_host_checks accept_passive_service_checks check_external_commands check_host_freshness check_service_freshness enable_event_handlers enable_flap_detection enable_notifications execute_host_checks execute_service_checks last_command_check last_log_rotation nagios_pid obsess_over_hosts obsess_over_services process_performance_data program_start interval_length'
-        response, keepalive = self.livestatus_broker.livestatus.handle_request(request)
-        print response
-
         request = """GET hosts
 Stats: name !=
 Stats: check_type = 0
@@ -853,6 +849,31 @@ ResponseHeader: fixed16"""
         print response
         for s in self.livestatus_broker.livestatus.services.values():
             print "%s %d %s;%d" % (s.state, s.state_id, s.state_type, s.attempt)
+
+
+    def test_thruk_config(self):
+        self.print_header()
+        if self.nagios_installed():
+            self.start_nagios('1r_1h_1s')
+        now = time.time()
+        host = self.sched.hosts.find_by_name("test_host_0")
+        host.checks_in_progress = []
+        host.act_depend_of = [] # ignore the router
+        router = self.sched.hosts.find_by_name("test_router_0")
+        router.checks_in_progress = []
+        router.act_depend_of = [] # ignore the router
+        svc = self.sched.services.find_srv_by_name_and_hostname("test_host_0", "test_ok_0")
+        svc.checks_in_progress = []
+        svc.act_depend_of = [] # no hostchecks on critical checkresults
+        self.scheduler_loop(2, [[host, 0, 'UP'], [router, 0, 'UP'], [svc, 2, 'BAD']])
+        self.update_broker()
+        #---------------------------------------------------------------
+        # get the full hosts table
+        #---------------------------------------------------------------
+        request = 'GET status\nColumns: livestatus_version program_version accept_passive_host_checks accept_passive_service_checks check_external_commands check_host_freshness check_service_freshness enable_event_handlers enable_flap_detection enable_notifications execute_host_checks execute_service_checks last_command_check last_log_rotation nagios_pid obsess_over_hosts obsess_over_services process_performance_data program_start interval_length'
+        response, keepalive = self.livestatus_broker.livestatus.handle_request(request)
+        print response
+
 
 
     def test_thruk_comments(self):
@@ -1872,7 +1893,7 @@ test_host_0;test_ok_0;CUSTNAME;custvalue
         self.update_broker()
         # timeperiods must be manipulated in the broker, because status-broks
         # contain timeperiod names, not objects.
-        lshost = self.livestatus_broker.find_host("test_host_0")
+        lshost = self.livestatus_broker.hosts["test_host_0"]
         now = time.time()
         localnow = time.localtime(now)
         if localnow[5] > 45:
@@ -1964,6 +1985,44 @@ And: 2"""
         response = ';'.join(response.split(';')[1:])
         print response
         self.assert_(self.lines_equal(response, good_response))
+
+
+    def test_database_shrink(self):
+        self.print_header()
+        for cycle in xrange(10):
+            for brok in xrange(100):
+                now = time.time()
+                b = Brok('log', {'log' : "[%lu] EXTERNAL COMMAND: [%lu] DISABLE_NOTIFICATIONS" % (now, now) })
+                self.livestatus_broker.manage_log_brok(b)
+            time.sleep(1)
+
+        self.update_broker()
+        self.livestatus_broker.dbcursor.execute('SELECT COUNT(*) FROM logs')
+        dbrows1 = self.livestatus_broker.dbcursor.fetchone()
+        response, keepalive = self.livestatus_broker.livestatus.handle_request("GET log\nColumns: time")
+        rows1 = len(response.splitlines())
+        size1 = os.path.getsize(self.livestatus_broker.database_file)
+        # now delete log entries older than 6 seconds
+        self.livestatus_broker.max_logs_age = 6.0 / 86400.0
+        self.livestatus_broker.cleanup_log_db()
+
+        self.livestatus_broker.dbcursor.execute('SELECT COUNT(*) FROM logs')
+        dbrows2 = self.livestatus_broker.dbcursor.fetchone()
+        response, keepalive = self.livestatus_broker.livestatus.handle_request("GET log\nColumns: time")
+        rows2 = len(response.splitlines())
+        size2 = os.path.getsize(self.livestatus_broker.database_file)
+        print "size1", size1
+        print "size2", size2
+        print "rows1", rows1
+        print "rows2", rows2
+        print "dbrows1", dbrows1
+        print "dbrows2", dbrows2
+        self.assert_(rows1 == dbrows1[0])
+        self.assert_(rows2 == dbrows2[0])
+        self.assert_(dbrows1 > dbrows2)
+        self.assert_(rows1 > rows2)
+        # The most important...database file shrunk
+        self.assert_(size1 > size2)
 
 
     def test_thruk_empty_stats(self):
@@ -2111,6 +2170,31 @@ Limit: 1001"""
         response, keepalive = self.livestatus_broker.livestatus.handle_request(request)
         print response
         self.assert_(response == 'test_host_0;test_ok_0;1;blablub\n')
+
+
+    def test_display_name(self):
+        self.print_header()
+        now = time.time()
+        objlist = []
+        for host in self.sched.hosts:
+            objlist.append([host, 0, 'UP'])
+        for service in self.sched.services:
+            objlist.append([service, 0, 'OK'])
+        self.scheduler_loop(1, objlist)
+        self.update_broker()
+        request = """GET hosts
+Filter: name = test_host_0
+Columns: name display_name"""
+        response, keepalive = self.livestatus_broker.livestatus.handle_request(request)
+        print response
+        self.assert_(response == 'test_host_0;test_host_0\n')
+        request = """GET services
+Filter: host_name = test_host_0
+Filter: description = test_ok_0
+Columns: description host_name display_name"""
+        response, keepalive = self.livestatus_broker.livestatus.handle_request(request)
+        print "hihi",response
+        self.assert_(response == 'test_ok_0;test_host_0;test_ok_0\n')
 
 
 
@@ -2508,6 +2592,89 @@ OutputFormat: csv
         print response
         # take first line, take members column, count list elements = 400 services
         self.assert_(len(((response.split("\n")[0]).split(';')[1]).split(',')) == 400)
+
+
+    def test_sorted_limit(self):
+        self.print_header()
+        if self.nagios_installed():
+            self.start_nagios('5r_100h_2000s')
+        now = time.time()
+        objlist = []
+        for host in self.sched.hosts:
+            objlist.append([host, 0, 'UP'])
+        for service in self.sched.services:
+            objlist.append([service, 0, 'OK'])
+        self.scheduler_loop(1, objlist)
+        # now send the list of services to the broker in an unordered way
+        sched_unsorted = '\n'.join(["%s;%s;%d" % (s.host_name, s.service_description, s.state_id) for s in self.sched.services])
+
+        self.update_broker()
+        live_sorted = '\n'.join(["%s;%s;%d" % (s.host_name, s.service_description, s.state_id) for s in self.livestatus_broker.services.values()])
+
+        # Unsorted in the scheduler, sorted in livestatus
+        self.assert_(sched_unsorted != live_sorted)
+        sched_live_sorted = '\n'.join(sorted(sched_unsorted.split('\n'))) + '\n'
+        sched_live_sorted = sched_live_sorted.strip()
+        print "first of sched\n(%s)\n--------------\n" % sched_unsorted[:100]
+        print "first of live \n(%s)\n--------------\n" % live_sorted[:100]
+        print "first of sssed \n(%s)\n--------------\n" % sched_live_sorted[:100]
+        print "last of sched\n(%s)\n--------------\n" % sched_unsorted[-100:]
+        print "last of live \n(%s)\n--------------\n" % live_sorted[-100:]
+        print "last of sssed \n(%s)\n--------------\n" % sched_live_sorted[-100:]
+        # But sorted they are the same. 
+        self.assert_('\n'.join(sorted(sched_unsorted.split('\n'))) == live_sorted)
+  
+        svc1 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_00")
+        print svc1
+        svc2 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_15")
+        print svc2
+        svc3 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_16")
+        print svc3
+        svc4 = self.sched.services.find_srv_by_name_and_hostname("test_host_007", "test_ok_05")
+        print svc4
+        svc5 = self.sched.services.find_srv_by_name_and_hostname("test_host_007", "test_ok_11")
+        svc6 = self.sched.services.find_srv_by_name_and_hostname("test_host_025", "test_ok_01")
+        svc7 = self.sched.services.find_srv_by_name_and_hostname("test_host_025", "test_ok_03")
+        self.scheduler_loop(1, [[svc1, 1, 'W'], [svc2, 1, 'W'], [svc3, 1, 'W'], [svc4, 2, 'C'], [svc5, 3, 'U'], [svc6, 2, 'C'], [svc7, 2, 'C']])
+        self.update_broker()
+        # 1993O, 3xW, 3xC, 1xU
+
+        # Get all bad services from livestatus
+        request = """GET services
+Columns: host_name service_description state
+ColumnHeaders: off
+OutputFormat: csv
+Filter: state != 0"""
+        response, keepalive = self.livestatus_broker.livestatus.handle_request(request)
+        # Get all bad services from the scheduler
+        sched_bad_unsorted = '\n'.join(["%s;%s;%d" % (s.host_name, s.service_description, s.state_id) for s in self.sched.services if s.state_id != 0])
+        # Check if the result of the query is sorted
+        self.assert_('\n'.join(sorted(sched_bad_unsorted.split('\n'))) == response.strip())
+
+        # Now get the first 3 bad services from livestatus
+        request = """GET services
+Limit: 3
+Columns: host_name service_description state
+ColumnHeaders: off
+OutputFormat: csv
+Filter: state != 0"""
+        response, keepalive = self.livestatus_broker.livestatus.handle_request(request)
+        print 'query_6_______________\n%s\n%s\n' % (request, response)
+
+        # Now compare the first 3 bad services with the scheduler data
+        self.assert_('\n'.join(sorted(sched_bad_unsorted.split('\n'))[:3]) == response.strip())
+
+        # Now check if all services are sorted when queried with a livestatus request
+        request = """GET services
+Columns: host_name service_description state
+ColumnHeaders: off
+OutputFormat: csv"""
+        response, keepalive = self.livestatus_broker.livestatus.handle_request(request)
+        # Again, get all bad services from the scheduler
+        sched_bad_unsorted = '\n'.join(["%s;%s;%d" % (s.host_name, s.service_description, s.state_id) for s in self.sched.services])
+        # Check if the result of the query is sorted
+        self.assert_('\n'.join(sorted(sched_bad_unsorted.split('\n'))) == response.strip())
+
 
 
 class TestConfigComplex(TestConfig):

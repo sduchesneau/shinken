@@ -73,9 +73,9 @@ class TestConfig(ShinkenTest):
 
         fd = open(mod.path)
         buf = fd.readline()
-        print "BUF:", buf
+        #print "BUF:", buf
         comparison = '%d\t%s\t%s\t%s\t%s\n' % (t, "test_host_0", 'BAD ', 'DOWN', ' value1=0 value2=0')
-        print "Comparison:", comparison
+        #print "Comparison:", comparison
         self.assert_(buf == comparison)
         fd.close()
         os.unlink(mod.path)
@@ -88,7 +88,7 @@ class TestConfig(ShinkenTest):
         print sl2.__dict__
         t = int(time.time())
         print "T", t
-        self.scheduler_loop(1, [[svc, 2, 'BAD | value1=0 value2=0']])
+        self.scheduler_loop(1, [[svc, 2, 'BAD | value1=0 value2=0'+u'\xf6']])
         #manage all host check result broks
         for b in self.sched.broks.values():
             if b.type == 'host_check_result':
@@ -96,10 +96,11 @@ class TestConfig(ShinkenTest):
         sl2.file.close()
 
         fd = open(mod.path)
-        buf = fd.readline()
-        print "BUF:", buf
-        comparison = '%d\t%s\t%s\t%s\t%s\n' % (t, "test_host_0", 'BAD ', ' value1=0 value2=0', 'DOWN')
-        print "Comparison:", comparison
+        buf = fd.readline().decode('utf8')
+        
+        #print "BUF:", buf
+        comparison = u'%d\t%s\t%s\t%s\t%s\n' % (t, "test_host_0", 'BAD ', ' value1=0 value2=0'+u'\xf6', 'DOWN')
+        #print "Comparison:", comparison
         self.assert_(buf == comparison)
         fd.close()
         os.unlink(mod.path)

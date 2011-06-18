@@ -113,6 +113,7 @@ class Service(SchedulingItem):
         'poller_tag':              StringProp(default='None'),
         'reactionner_tag':              StringProp(default='None'),
         'resultmodulations':       StringProp(default=''),
+        'criticitymodulations':    StringProp(default=''),
         'escalations':             StringProp(default='', fill_brok=['full_status']),
         'maintenance_period':      StringProp(default='', fill_brok=['full_status']),
 
@@ -170,7 +171,7 @@ class Service(SchedulingItem):
         'comments':           ListProp (default=[], fill_brok=['full_status'], retention=True),
         'flapping_changes':   ListProp (default=[], fill_brok=['full_status'], retention=True),
         'flapping_comment_id': IntegerProp(default=0, fill_brok=['full_status'], retention=True),
-        'percent_state_change': FloatProp(default=0.0, fill_brok=['full_status'], retention=True),
+        'percent_state_change': FloatProp(default=0.0, fill_brok=['full_status', 'check_result'], retention=True),
         'problem_has_been_acknowledged': BoolProp(default=False, fill_brok=['full_status'], retention=True),
         'acknowledgement':    StringProp(default=None, retention=True),
         'acknowledgement_type': IntegerProp(default=1, fill_brok=['full_status', 'check_result'], retention=True),
@@ -240,6 +241,7 @@ class Service(SchedulingItem):
         'in_hard_unknown_reach_phase': BoolProp(default=False, retention=True),
         'was_in_hard_unknown_reach_phase': BoolProp(default=False, retention=True),
         'state_before_hard_unknown_reach_phase': StringProp(default='OK', retention=True),
+        
     })
 
     # Mapping between Macros and properties (can be prop or a function)
@@ -639,6 +641,18 @@ class Service(SchedulingItem):
                                                          self.output))
 
 
+    # If the configuration allow it, raise an initial log like
+    # CURRENT SERVICE STATE: server;Load;UNKNOWN;HARD;1;I don't know what to say...
+    def raise_initial_state(self):
+        if self.__class__.log_initial_states:
+            logger.log('CURRENT SERVICE STATE: %s;%s;%s;%s;%d;%s' % (self.host.get_name(),
+                                                         self.get_name(),
+                                                         self.state,
+                                                         self.state_type,
+                                                         self.attempt,
+                                                         self.output))
+
+
     # Add a log entry with a Freshness alert like:
     # Warning: The results of host 'Server' are stale by 0d 0h 0m 58s (threshold=0d 1h 0m 0s).
     # I'm forcing an immediate check of the host.
@@ -680,14 +694,14 @@ class Service(SchedulingItem):
     # Raise a log entry with FLAPPING START alert like
     # SERVICE FLAPPING ALERT: server;LOAD;STARTED; Service appears to have started flapping (50.6% change >= 50.0% threshold)
     def raise_flapping_start_log_entry(self, change_ratio, threshold):
-        logger.log("SERVICE FLAPPING ALERT: %s;%s;STARTED; Service appears to have started flapping (%.1f% change >= %.1% threshold)" % \
+        logger.log("SERVICE FLAPPING ALERT: %s;%s;STARTED; Service appears to have started flapping (%.1f%% change >= %.1f%% threshold)" % \
                       (self.host.get_name(), self.get_name(), change_ratio, threshold))
 
 
     # Raise a log entry with FLAPPING STOP alert like
     # SERVICE FLAPPING ALERT: server;LOAD;STOPPED; Service appears to have stopped flapping (23.0% change < 25.0% threshold)
     def raise_flapping_stop_log_entry(self, change_ratio, threshold):
-        logger.log("SERVICE FLAPPING ALERT: %s;%s;STOPPED; Service appears to have stopped flapping (%.1f% change < %.1% threshold)" % \
+        logger.log("SERVICE FLAPPING ALERT: %s;%s;STOPPED; Service appears to have stopped flapping (%.1f%% change < %.1f%% threshold)" % \
                       (self.host.get_name(), self.get_name(), change_ratio, threshold))
 
 
@@ -948,7 +962,8 @@ class Services(Items):
     # service -> timepriods
     # service -> contacts
     def linkify(self, hosts, commands, timeperiods, contacts,
-                resultmodulations, escalations, servicegroups):
+                resultmodulations, criticitymodulations, escalations,
+                servicegroups):
         self.linkify_with_timeperiods(timeperiods, 'notification_period')
         self.linkify_with_timeperiods(timeperiods, 'check_period')
         self.linkify_with_timeperiods(timeperiods, 'maintenance_period')
@@ -958,6 +973,7 @@ class Services(Items):
         self.linkify_one_command_with_commands(commands, 'event_handler')
         self.linkify_with_contacts(contacts)
         self.linkify_with_resultmodulations(resultmodulations)
+        self.linkify_with_criticitymodulations(criticitymodulations)
         # WARNING: all escalations will not be link here
         # (just the escalation here, not serviceesca or hostesca).
         # This last one will be link in escalations linkify.
@@ -1034,7 +1050,7 @@ class Services(Items):
     # So service will take info from host if necessery
     def apply_implicit_inheritance(self, hosts):
         for prop in ( 'contacts', 'contact_groups', 'notification_interval',
-                         'notification_period', 'resultmodulations', 'escalations',
+                         'notification_period', 'resultmodulations', 'criticitymodulations', 'escalations',
                          'poller_tag', 'reactionner_tag', 'check_period', 'criticity' ):
             for s in self:
                 if not s.is_tpl():
@@ -1185,7 +1201,7 @@ class Services(Items):
         # Servicegroups property need to be fullfill for got the informations
         # And then just register to this service_group
         for s in self:
-            if not s.is_tpl():
+            if not s.is_tpl() and hasattr(s,'service_description'):
                 sname = s.service_description
                 shname = getattr(s ,'host_name', '')
                 if hasattr(s, 'servicegroups'):

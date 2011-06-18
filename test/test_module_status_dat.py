@@ -61,6 +61,8 @@ class TestConfig(ShinkenTest):
         except :
             pass
 
+
+
         sl = get_instance(mod)
         print sl
         #Hack here :(
@@ -72,6 +74,11 @@ class TestConfig(ShinkenTest):
         for b in self.sched.broks.values():
             b.instance_id = 0
             sl.manage_brok(b)
+
+        # Be fun, and add some utf8 char in hosts ;)
+        for h in sl.hosts.values():
+            print h.__dict__
+            h.host_name = h.host_name + u'\xf6'
 
         #Now verify the objects.dat file
         sl.objects_cache.create_or_update()
@@ -85,7 +92,7 @@ class TestConfig(ShinkenTest):
         nb_hosts = self.nb_of_string(buf, "define host {")
         self.assert_(nb_hosts == 2)
 
-        #Same for status.dat.
+        #Same for status.dat.        
         sl.status.create_or_update()
         status = open(mod.status_file)
         buf = status.read()
@@ -104,15 +111,21 @@ class TestConfig(ShinkenTest):
         #now check if after a resend we still got the good number
         self.sched.broks.clear()
         self.sched.fill_initial_broks()
-        for b in self.sched.broks.values():
+        #And in the good order!!!
+        b_ids = self.sched.broks.keys()
+        b_ids.sort()
+        for b_id in b_ids:
+            b = self.sched.broks[b_id]
             b.instance_id = 0
+            #print "Add brok", b.type
             sl.manage_brok(b)
-
+        print "Generate file", mod.object_cache_file
         #Now verify the objects.dat file
         sl.objects_cache.create_or_update()
         obj = open(mod.object_cache_file)
         buf = obj.read()
         obj.close()
+        #print buf
         #Check for 1 service and only one
         nb_services = self.nb_of_string(buf, "define service {")
         self.assert_(nb_services == 1)

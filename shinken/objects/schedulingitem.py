@@ -99,6 +99,7 @@ class SchedulingItem(Item):
 
         if len(self.flapping_changes) > flap_history:
             self.flapping_changes.pop(0)
+
         # Now we add a value, we update the is_flapping prop
         self.update_flapping()
 
@@ -115,6 +116,14 @@ class SchedulingItem(Item):
             if b:
                 r += i*(1.2-0.8)/flap_history + 0.8
         r = r / flap_history
+        r *= 100
+
+        # We can update our value
+        self.percent_state_change = r
+
+        # Look if we are full in our states, because if not
+        # the value is not accurate
+        is_full = len(self.flapping_changes) >= flap_history
 
         # Now we get the low_flap_threshold and high_flap_threshold values
         # They can be from self, or class
@@ -126,16 +135,24 @@ class SchedulingItem(Item):
             cls = self.__class__
             high_flap_threshold = cls.high_flap_threshold
 
-        # Now we check is flapping change
-        if self.is_flapping and r < low_flap_threshold:
+        # Now we check is flapping change, but only if we got enouth
+        # states to llok at the value accurancy
+        if self.is_flapping and r < low_flap_threshold and is_full:
             self.is_flapping = False
-            #We also raise a log entry
+            # We also raise a log entry
             self.raise_flapping_stop_log_entry(r, low_flap_threshold)
-        if not self.is_flapping and r >= high_flap_threshold:
+            # And update our status for modules
+            b = self.get_update_status_brok()
+            self.broks.append(b)
+
+        if not self.is_flapping and r >= high_flap_threshold and is_full:
             self.is_flapping = True
             # We also raise a log entry
             self.raise_flapping_start_log_entry(r, high_flap_threshold)
-        self.percent_state_change = r
+            # And update our status for modules
+            b = self.get_update_status_brok()
+            self.broks.append(b)
+
 
 
     # Add an attempt but cannot be more than max_check_attempts
@@ -208,16 +225,35 @@ class SchedulingItem(Item):
         if self.my_own_criticity == -1:
             self.my_own_criticity = self.criticity
 
+        # We look at our crit modulations. If one apply, we take apply it
+        # and it's done
+        in_modulation = False
+        for cm in self.criticitymodulations:
+            now = time.time()
+            period = cm.modulation_period
+            if period is None or period.is_time_valid(now):                    
+                #print "My self", self.get_name(), "go from crit", self.criticity, "to crit", cm.criticity
+                self.criticity = cm.criticity
+                in_modulation = True
+                # We apply the first available, that's all
+                break
+
         # If we trully have impacts, we get the max criticity
         # if it's huge than ourselve
         if len(self.impacts) != 0:
             self.criticity = max(self.criticity, max([e.criticity for e in self.impacts]))
-        elif self.my_own_criticity != -1:
+            return
+
+        # If we are not a problem, we setup our own_crit if we are not in a 
+        # modulation period
+        if self.my_own_criticity != -1 and not in_modulation:
             self.criticity = self.my_own_criticity
+            
 
 
     # Look for my impacts, and remove me from theirs problems list
     def no_more_a_problem(self):
+        was_pb = self.is_problem
         if self.is_problem:
             self.is_problem = False
 
@@ -228,12 +264,16 @@ class SchedulingItem(Item):
             # we can just drop our impacts list
             self.impacts = []
 
+        # We update our criticy value, it's not a huge thing :)
+        self.update_criticity_value()
+
+        # If we were a problem, we say to everyone
+        # our new status, with good criticity value
+        if was_pb:
             # And we register a new broks for update status
             b = self.get_update_status_brok()
             self.broks.append(b)
 
-        # We update our criticy value, it's not a huge thing :)
-        self.update_criticity_value()
 
 
     # call recursively by potentials impacts so they
@@ -543,7 +583,7 @@ class SchedulingItem(Item):
         cmd = m.resolve_command(self.event_handler, data)
         rt = self.event_handler.reactionner_tag
         e = EventHandler(cmd, timeout=cls.event_handler_timeout, \
-                             reactionner_tag=rt)
+                             ref=self, reactionner_tag=rt)
         #print "DBG: Event handler call created"
         #print "DBG: ",e.__dict__
         self.raise_event_handler_log_entry(self.event_handler)
@@ -1183,7 +1223,7 @@ class SchedulingItem(Item):
             cmd = m.resolve_command(cls.perfdata_command, data)
             reactionner_tag = cls.perfdata_command.reactionner_tag
             e = EventHandler(cmd, timeout=cls.perfdata_timeout,
-                             reactionner_tag=reactionner_tag)
+                             ref=self, reactionner_tag=reactionner_tag)
 
             # ok we can put it in our temp action queue
             self.actions.append(e)

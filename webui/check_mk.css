@@ -28,7 +28,8 @@ th {
 body.main {
     background-attachment: fixed;
     /*background-image: url("images/contentframe_background.jpg");*/
-    background-image: url("images/to-green.jpg");
+    /*background-image: url("images/to-green.jpg");*/
+    background-color : black;
     background-repeat: repeat;
     /*background-repeat: repeat-x;*/
     font-family: arial, helvetica, sans-serif;
@@ -120,7 +121,7 @@ body.side {
     background-attachment: fixed;
     background-repeat: repeat;
     /*background-image: url("images/snapinframe_background.jpg");*/
-    background-image: url("images/to-green.png");
+    /*background-image: url("images/to-green.png");*/
     font-family: arial, helvetica, sans-serif;
     font-size: 9pt;
     padding: 0;
@@ -427,7 +428,7 @@ h1 {
     font-size: 17pt;
     margin-top: 0px;
     margin-bottom: 5px;
-    margin-left: 5px;
+/*    margin-left: 5px;*/
 }
 
 table.heading {
@@ -1897,9 +1898,9 @@ table.aggrtree td.node {
 /* The panel that will contain all problem panels*/
 .problems-panels {
     position: fixed;
-    left: 500px;
+    left: 515px;
     right: 0;
-    top: 60px;
+    top: 200px;
     width: 100%;
 }
 
@@ -1908,7 +1909,7 @@ table.aggrtree td.node {
 /* problem impact panel */
 .problems-panel {
     height: 600px; 
-    width: 575px;
+    width: 550px;
     background: white;
     position: relative;
     /* by default it's hidden*/
@@ -1929,7 +1930,7 @@ table.aggrtree td.node {
 
 /* The whole left panel for impacts*/
 .impacts-panel {
-    width: 450px;
+    width: 445px;
     float: left;
     display: inline-block;
     border-radius: 6px;
@@ -1970,6 +1971,29 @@ table.aggrtree td.node {
     background-image: url("images/alpha_black.png");
 }
 
+.impact-active{
+    background-image: url("images/right-black-arrow.png");
+    color: #FFF!important;
+}
+
+/*p.impact-active {
+            background:  url('../feature-tab-current.png');
+            color: #FFF;
+        }
+*/
+
+.impact-active .impact-state-text {
+    color: #FFF;
+}
+
+.impact-active .impact-duration{
+    color: #FFF;
+}
+
+.impact-active .impact-name{
+    color: #FFF;
+}
+
 /* One problem block*/
 .problem {
     position: relative;
@@ -2005,6 +2029,15 @@ table.aggrtree td.node {
     width: 50px;
     margin-top: 3px;
 }
+
+.impact-icon-big {
+    float: left;
+    height: 80px;
+    overflow: hidden;
+    width: 80px;
+    margin-top: 3px;
+}
+
 
 /* The show problem image, on the right of the impact*/
 .criticity-icon-1 {
@@ -2053,17 +2086,17 @@ table.aggrtree td.node {
 /* The link of the impact on its name */
 .impact-name {
     font-weight: bold;
-    color: #333!important;
+    color: #333;
 }
 
 /* The link of the impact on its name */
 .impact-state-text {
-    color: #333!important;
+    color: #333
 }
 
 /* The text of the duration of impacts */
 .impact-duration {
-    color: #999!important;
+    color: #999;
     font-size: 11px;
 }
 
@@ -2078,9 +2111,13 @@ table.aggrtree td.node {
 
 /* Global container */
 .whole-page {
-    min-width: 920px;
-    max-width: 1040px;
-    margin: 0 40px;
+    width: 92%;
+    margin-left: 4%;
+    margin-right: 4%;
+    /*min-width: 920px;
+    max-width: 1040px;*/
+    /*margin: 5px 40px;*/
+    margin-top : 5px;
     position: relative;
     z-index: 1;
     border-radius: 5px;
@@ -2239,3 +2276,28 @@ cursor: pointer;
     color:#FFF;
 }
 
+
+
+
+
+
+/* From Meatball css */
+/* branding
+----------------------------------------------- */
+h1#branding {
+    font-weight:normal;
+    font-size:3em;
+    text-align:left;
+    background:#005577;
+    padding:.7em 1em;
+    margin-bottom:0;
+}
+
+h4#page-heading {
+font-weight: normal;
+padding: .5em;
+margin: 0 0 10px 0;
+border-bottom: 1px solid #CCC;
+background: #EDF4F5;
+font-size: 19px;
+}

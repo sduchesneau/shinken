@@ -48,13 +48,13 @@ class EventHandler(Action):
         'timeout':        IntegerProp(default=10),
         'check_time':     IntegerProp(default=0),
         'command':        StringProp (default=''),
-        'module_type':    StringProp (default=''),
+        'module_type':    StringProp (default='fork'),
         'worker':         StringProp (default='none'),
         'reactionner_tag':     StringProp (default='None'),
     }
 
     #id = 0 #Is common to Actions
-    def __init__(self, command, id=None, timeout=10, env={}, \
+    def __init__(self, command, id=None, ref=None, timeout=10, env={}, \
                      module_type='fork', reactionner_tag='None'):
         self.is_a = 'eventhandler'
         self.type = ''
@@ -62,6 +62,7 @@ class EventHandler(Action):
         if id is None: #id != None is for copy call only
             self.id = Action.id
             Action.id += 1
+        self.ref = ref
         self._in_timeout = False
         self.timeout = timeout
         self.exit_status = 3
@@ -143,3 +144,5 @@ class EventHandler(Action):
                 setattr(self, prop, state[prop])
         if not hasattr(self, 'worker'):
             self.worker = 'none'
+        if not getattr(self, 'module_type', None):
+            self.module_type = 'fork'

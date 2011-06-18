@@ -25,6 +25,8 @@ import socket
 from shinken.satellitelink import SatelliteLink, SatelliteLinks
 from shinken.property import BoolProp, IntegerProp, StringProp, ListProp
 
+from shinken.log import logger
+
 class ArbiterLink(SatelliteLink):
     id = 0
     my_type = 'arbiter'
@@ -53,7 +55,7 @@ class ArbiterLink(SatelliteLink):
 
 
     def is_me(self):
-        print "Hostname:%s, gethostname:%s" % (self.host_name, socket.gethostname())
+        logger.log("And arbiter is launched with the hostname:%s of addr :%s" % (self.host_name, socket.gethostname()), print_it=False)
         return self.host_name == socket.gethostname()
 
 
@@ -86,13 +88,3 @@ class ArbiterLinks(SatelliteLinks):
         self.linkify_s_by_plug(modules)
 
 
-    def linkify_s_by_plug(self, modules):
-        for s in self:
-            new_modules = []
-            for plug_name in s.modules:
-                plug = modules.find_by_name(plug_name.strip())
-                if plug is not None:
-                    new_modules.append(plug)
-                else:
-                    print "Error : the module %s is unknow for %s" % (plug_name, s.get_name())
-            s.modules = new_modules

@@ -84,6 +84,8 @@ class Scheduler:
             # clean some times possibel overriden Queues, to do not explode in memory usage
             # every 1/4 of hour
             14 : ('clean_queues', self.clean_queues, 1),
+            # Look for new criticity change by modulation every minute
+            15 : ('update_criticities', self.update_criticities, 60),
         }
 
         # stats part
@@ -376,12 +378,44 @@ class Scheduler:
             self.comments[c_id].ref.del_comment(c_id)
             del self.comments[c_id]
 
+    # We update all criticity for looking at new modulation
+    # start for impacts, and so update broks status and
+    # problems value too
+    def update_criticities(self):
+        for t in [self.hosts, self.services]:
+            # We first update impacts and classic elements
+            for i in [i for i in t if not i.is_problem]:
+                was = i.criticity
+                i.update_criticity_value()
+                new = i.criticity
+                # Ok, the criticity change, we can update the broks
+                if new != was:
+                    #print "The elements", i.get_name(), "change it's criticity value"
+                    self.get_and_register_status_brok(i)
+                    
+        # When all impacts and classic elements are updated,
+        # we can update problems (their value depend on impacts, so
+        # they must be done after)
+        for t in [self.hosts, self.services]:
+            # We first update impacts and classic elements
+            for i in [i for i in t if i.is_problem]:
+                was = i.criticity
+                i.update_criticity_value()
+                new = i.criticity
+                # Maybe one of the impacts change it's criticity to a high value
+                # and so ask for the problem to raise too
+                if new != was:
+                    #print "The elements", i.get_name(), "change it's criticity value from", was, "to", new 
+                    self.get_and_register_status_brok(i)
+
+
 
     # Called by poller to get checks
     # Can get checks and actions (notifications and co)
     def get_to_run_checks(self, do_checks=False, do_actions=False,
                           poller_tags=['None'], reactionner_tags=['None'], \
-                              worker_name='none'):
+                              worker_name='none', module_types=['fork']
+                          ):
         res = []
         now = time.time()
 
@@ -392,7 +426,8 @@ class Scheduler:
                 #  with same name, go for it
                 # if do_check, call for poller, and so poller_tags by default is ['None']
                 # by default poller_tag is 'None' and poller_tags is ['None']
-                if c.poller_tag in poller_tags:
+                # and same for module_type, the default is the 'fork' type
+                if c.poller_tag in poller_tags and c.module_type in module_types:
                     # must be ok to launch, and not an internal one (business rules based)
                     if c.status == 'scheduled' and c.is_launchable(now) and not c.internal:
                         c.status = 'inpoller'
@@ -410,6 +445,10 @@ class Scheduler:
                 # by default reactionner_tag is 'None' and ractioner_tags is ['None'] too
                 # So if not the good one, loop for next :)
                 if not a.reactionner_tag in reactionner_tags:
+                    continue
+                
+                # same for module_type
+                if not a.module_type in module_types:
                     continue
 
                 # And now look for can launch or not :)
@@ -473,13 +512,21 @@ class Scheduler:
         if c.is_a == 'notification':
             # We will only see childnotifications here
             try:
+                timeout = False
+                if c.status == 'timeout':
+                    # Unfortunately the remove_in_progress_notification
+                    # sets the status to zombie, so we need to save it here.
+                    timeout = True
+                    execution_time = c.execution_time
                 self.actions[c.id].get_return_from(c)
                 item = self.actions[c.id].ref
                 item.remove_in_progress_notification(c)
                 self.actions[c.id].status = 'zombie'
                 item.last_notification = c.check_time
                 #If we' ve got a problem with the notification, raise a Warning log
-                if c.exit_status != 0:
+                if timeout:
+                    logger.log("Warning: Contact %s %s notification command '%s ' timed out after %d seconds" % (self.actions[c.id].contact.contact_name, self.actions[c.id].ref.__class__.my_type, self.actions[c.id].command, int(execution_time)))
+                elif c.exit_status != 0:
                     logger.log("Warning : the notification command '%s' raised an error (exit code=%d) : '%s'" % (c.command, c.exit_status, c.output))
             except KeyError , exp: #bad number for notif, not so terrible
                 pass
@@ -489,6 +536,9 @@ class Scheduler:
 
         elif c.is_a == 'check':
             try:
+                if c.status == 'timeout':
+                    c.output = "(%s Check Timed Out)" % self.checks[c.id].ref.__class__.my_type.capitalize()
+                    c.long_output = c.output
                 self.checks[c.id].get_return_from(c)
                 self.checks[c.id].status = 'waitconsume'
             except KeyError , exp:
@@ -496,6 +546,8 @@ class Scheduler:
         elif c.is_a == 'eventhandler':
             # It just die
             try:
+                if c.status == 'timeout':
+                    logger.log("Warning: %s event handler command '%s ' timed out after %d seconds" % (self.actions[c.id].ref.__class__.my_type.capitalize(), self.actions[c.id].command, int(c.execution_time)))
                 self.actions[c.id].status = 'zombie'
             # Maybe we reveied a return of a old even handler, so we can forget it
             except KeyError:
@@ -583,7 +635,7 @@ class Scheduler:
             con = p['con']
             poller_tags = p['poller_tags']
             if con is not None:
-            # get actions
+                # get actions
                 lst = self.get_to_run_checks(True, False, poller_tags, worker_name=p['name'])
                 try:
                     # intial ping must be quick
@@ -946,6 +998,12 @@ class Scheduler:
                 b = i.get_initial_status_brok()
                 self.add(b)
 
+        # Ask for INITIAL logs for services and hosts
+        for i in self.hosts:
+            i.raise_initial_state()
+        for i in self.services:
+            i.raise_initial_state()
+
         # Add a brok to say that we finished all initial_pass
         b = Brok('initial_broks_done', {'instance_id' : self.instance_id})
         self.add(b)
@@ -997,6 +1055,9 @@ class Scheduler:
                 "modified_service_attributes" : 0,
                 "global_host_event_handler" : self.conf.global_host_event_handler,
                 'global_service_event_handler' : self.conf.global_service_event_handler,
+                'check_external_commands' : self.conf.check_external_commands,
+                'check_service_freshness' : self.conf.check_service_freshness,
+                'check_host_freshness' : self.conf.check_host_freshness,
                 'command_file' : self.conf.command_file
                 }
         b = Brok('program_status', data)
@@ -1220,7 +1281,7 @@ class Scheduler:
 
         gogogo = time.time()
 
-        self.load_one_min = Load()
+        self.load_one_min = Load(initial_value=1)
 
         while self.must_run:
             elapsed, _, _ = self.sched_daemon.handleRequests(timeout)
@@ -1230,7 +1291,11 @@ class Scheduler:
                     continue
 
             self.load_one_min.update_load(self.sched_daemon.sleep_time)
-            print "Time sleep : %.2f (average : %.2f)" % (self.sched_daemon.sleep_time, self.load_one_min.get_load())
+
+            # load of the scheduler is the percert of time it is waiting
+            l = min(100, 100.0 - self.load_one_min.get_load() * 100)
+            print "Load : (sleep) %.2f (average : %.2f) -> %d%%" % (self.sched_daemon.sleep_time, self.load_one_min.get_load(), l)
+
             self.sched_daemon.sleep_time = 0.0
 
             # Timeout or time over
@@ -1284,9 +1349,11 @@ class Scheduler:
             #        print "Notif:", a.id, a.type, a.status, a.ref.get_name(), a.ref.state, a.contact.get_name(), 'level:%d' % a.notif_nb, 'launch in', int(a.t_to_go - now)
             #    else:
             #        print "Event:", a.id, a.status
-            print "Nb checks send:", self.nb_checks_send
+            if self.nb_checks_send != 0:
+                print "Nb checks/notifications/event send:", self.nb_checks_send
             self.nb_checks_send = 0
-            print "Nb Broks send:", self.nb_broks_send
+            if self.nb_broks_send != 0:
+                print "Nb Broks send:", self.nb_broks_send
             self.nb_broks_send = 0
 
             time_elapsed = now - gogogo

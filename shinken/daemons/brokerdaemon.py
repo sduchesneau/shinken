@@ -28,7 +28,7 @@ import traceback
 from multiprocessing import active_children
 from Queue import Empty
 
-from shinken.satellite import BaseSatellite, IForArbiter
+from shinken.satellite import BaseSatellite
 
 from shinken.property import PathProp, IntegerProp
 from shinken.util import sort_by_ids
@@ -76,6 +76,7 @@ class Broker(BaseSatellite):
 
         self.timeout = 1.0
 
+
     # Schedulers have some queues. We can simplify call by adding
     # elements into the proper queue just by looking at their type
     # Brok -> self.broks
@@ -92,7 +93,7 @@ class Broker(BaseSatellite):
             print "Adding in queue an external command", ExternalCommand.__dict__
             self.external_commands.append(elt)
         # Maybe we got a Message from the modules, it's way to ask something
-        #like from now a full data from a scheduler for example.
+        # like from now a full data from a scheduler for example.
         elif cls_type == 'message':
             # We got a message, great!
             print elt.__dict__
@@ -109,6 +110,12 @@ class Broker(BaseSatellite):
                         self.schedulers[c_id]['running_id'] = 0
                     except KeyError: # maybe this instance was not known, forget it
                         print "WARNING: a module ask me a full_instance_id for an unknown ID!", c_id
+            # Maybe a module say me that it's dead, I must log it's last words...
+            if elt.get_type() == 'ICrash':
+                data = elt.get_data()
+                logger.log('ERROR : the module %s just crash! Please look at the traceback:' % data['name'])
+                logger.log(data['trace'])
+                # The module dead will be look elsewhere and put in restarted.
 
 
     # Get teh good tabs for links by the kind. If unknown, return None
@@ -443,6 +450,23 @@ class Broker(BaseSatellite):
 
         for rea_id in self.reactionners:
             self.pynag_con_init(rea_id, type='reactionner')
+
+
+    # An arbiter ask us to wait a new conf, so we must clean
+    # all our mess we did, and close modules too
+    def clean_previous_run(self):
+        # Clean all lists
+        self.schedulers.clear()
+        self.pollers.clear()
+        self.reactionners.clear()
+        self.broks = self.broks[:]
+        self.broks_internal_raised = self.broks_internal_raised[:]
+        self.external_commands = self.external_commands[:]
+
+        # And now modules
+        self.have_modules = False
+        self.modules_manager.clear_instances()
+
         
 
     def do_loop_turn(self):
@@ -450,6 +474,20 @@ class Broker(BaseSatellite):
 
         # Begin to clean modules
         self.check_and_del_zombie_modules()
+
+        # Maybe the arbiter ask us to wait for a new conf
+        # If true, we must restart all...
+        if self.cur_conf is None:
+            # Clean previous run from useless objects
+            # and close modules
+            self.clean_previous_run()
+            
+            self.wait_for_initial_conf()
+            # we may have been interrupted or so; then 
+            # just return from this loop turn
+            if not self.new_conf:  
+                return
+            self.setup_new_conf()
 
         # Now we check if arbiter speek to us in the pyro_daemon.
         # If so, we listen for it

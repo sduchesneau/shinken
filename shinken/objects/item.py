@@ -629,10 +629,12 @@ class Items(object):
                 i = self.items[id]
                 print "Error: the", i.__class__.my_type, i.get_name(), "is duplicated from", i.imported_from
                 r = False
+
         # Then look if we have some errors in the conf
         # Juts print warnings, but raise errors
         for err in self.configuration_warnings:
             print err
+
         for err in self.configuration_errors:
             print err
             r = False
@@ -641,7 +643,7 @@ class Items(object):
         for i in self:
             if not i.is_correct():
                 n = getattr(i, 'imported_from', "unknown")
-                print "Error: In ", i.get_name(), "is incorrect ; from", n
+                print "Error: In", i.get_name(), "is incorrect ; from", n
                 r = False        
         
         return r
@@ -763,9 +765,47 @@ class Items(object):
                     rm = resultmodulations.find_by_name(rm_name)
                     if rm is not None:
                         new_resultmodulations.append(rm)
+                    else:
+                        err = "The result modulation '%s'defined on the %s '%s' do not exist" % (rm_name, i.__class__.my_type, i.get_name())
+                        i.configuration_errors.append(err)
+                        continue
+                i.resultmodulations = new_resultmodulations
+
+
+    # Make link between item and it's resultmodulations
+    def linkify_with_criticitymodulations(self, criticitymodulations):
+        for i in self:
+            if hasattr(i, 'criticitymodulations'):
+                criticitymodulations_tab = i.criticitymodulations.split(',')
+                criticitymodulations_tab = strip_and_uniq(criticitymodulations_tab)
+                new_criticitymodulations = []
+                for rm_name in criticitymodulations_tab:
+                    rm = criticitymodulations.find_by_name(rm_name)
+                    if rm is not None:
+                        new_criticitymodulations.append(rm)
+                    else:
+                        err = "The criticity modulation '%s'defined on the %s '%s' do not exist" % (rm_name, i.__class__.my_type, i.get_name())
+                        i.configuration_errors.append(err)
+                        continue
+                i.criticitymodulations = new_criticitymodulations
+
+
+
+    # Make link between item and it's resultmodulations
+    def linkify_with_resultmodulations(self, resultmodulations):
+        for i in self:
+            if hasattr(i, 'resultmodulations'):
+                resultmodulations_tab = i.resultmodulations.split(',')
+                resultmodulations_tab = strip_and_uniq(resultmodulations_tab)
+                new_resultmodulations = []
+                for rm_name in resultmodulations_tab:
+                    rm = resultmodulations.find_by_name(rm_name)
+                    if rm is not None:
+                        new_resultmodulations.append(rm)
                     else: # TODO WHAT?
                         pass
                 i.resultmodulations = new_resultmodulations
+
 
 
     # If we've got a contact_groups properties, we search for all
@@ -920,12 +960,15 @@ class Items(object):
                     elif h == '*':
                         for newhost in get_all_host_names_set(hosts):
                             hnames_list.append(newhost)
-                            print "DBG in item.explode_host_groups_into_hosts , added '%s' to group '%s'" % (newhost, i)
+                            #print "DBG in item.explode_host_groups_into_hosts , added '%s' to group '%s'" % (newhost, i)
                     else:
                         hnames_list.append(h)
             
             i.host_name = ','.join(list(set(hnames_list)))
 
+            # Ok, enven with all of it, there is still no host, put it as a template
+            if i.host_name == '':
+                i.register = '0'
 
 
 

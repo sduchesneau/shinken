@@ -35,7 +35,7 @@ if arbiter want it to have a new conf, satellite forgot old schedulers
 """
 
 
-from multiprocessing import Queue, Manager, active_children
+from multiprocessing import Queue, Manager, active_children, cpu_count
 import os
 import copy
 import time
@@ -77,6 +77,7 @@ class IForArbiter(Interface):
     # Arbiter ask me which sched_id I manage, If it is not ok with it
     # It will ask me to remove one or more sched_id
     def what_i_managed(self):
+        print "%s DBG: the arbiter ask me what I manage. It's %s" % (int(time.time()), self.app.schedulers.keys())
         return self.app.schedulers.keys()
 
     # Call by arbiter if it thinks we are running but we must do not (like
@@ -251,7 +252,9 @@ class Satellite(BaseSatellite):
         except KeyError:
             pass
         # We tag it as want return, and move it in the wait return queue
-        action.status = 'waitforhomerun'
+        # Stop, if it is "timeout" we need this information later 
+        # in the scheduler
+        #action.status = 'waitforhomerun'
         try:
             self.schedulers[sched_id]['wait_homerun'][action.get_id()] = action
         except KeyError:
@@ -323,7 +326,16 @@ class Satellite(BaseSatellite):
     # It can be mortal or not
     def create_and_launch_worker(self, module_name='fork', mortal=True):
         # ceate the input queue of this worker
-        q = Queue()
+        try:
+            q = Queue()
+        # If we got no /dev/shm on linux, we can got problem here. 
+        # Must raise with a good message
+        except OSError, exp:
+            # We look for the "Function not implemented" under Linux
+            if e.errno == 38 and os.name == 'posix':
+                logger.log("ERROR : get an exception (%s). If you are under Linux, please check that your /dev/shm directory exists." % (str(exp)))
+            raise
+            
 
         # If we are in the fork module, do not specify a target
         target = None
@@ -526,7 +538,8 @@ class Satellite(BaseSatellite):
                     tmp = con.get_checks(do_checks=do_checks, do_actions=do_actions, \
                                              poller_tags=self.poller_tags, \
                                              reactionner_tags=self.reactionner_tags, \
-                                             worker_name=self.name)
+                                             worker_name=self.name, \
+                                             module_types=self.q_by_mod.keys())
                     print "Ask actions to", sched_id, "got", len(tmp)
                     # We 'tag' them with sched_id and put into queue for workers
                     # REF: doc/shinken-action-queues.png (2)
@@ -706,9 +719,22 @@ we must register our interfaces for 3 possible callers: arbiter, schedulers or b
                 # And then we connect to it :)
                 self.pynag_con_init(sched_id)
 
-        # Now the limit part
+        # Now the limit part, 0 mean : number of cpu of this machine :)
+        # if not available, use 4 (modern hardware)
         self.max_workers = g_conf['max_workers']
+        if self.max_workers == 0:
+            try:
+                self.max_workers = cpu_count()
+            except NotImplementedError:
+                self.max_workers =4
+            logger.log("Using max workers : %s" % self.max_workers)
         self.min_workers = g_conf['min_workers']
+        if self.min_workers == 0:
+            try:
+                self.min_workers = cpu_count()
+            except NotImplementedError:
+                self.min_workers =4
+            logger.log("Using min workers : %s" % self.min_workers)
 
         self.processes_by_worker = g_conf['processes_by_worker']
         self.polling_interval = g_conf['polling_interval']
@@ -719,7 +745,6 @@ we must register our interfaces for 3 possible callers: arbiter, schedulers or b
         self.poller_tags = g_conf.get('poller_tags', ['None'])
         self.reactionner_tags = g_conf.get('reactionner_tags', ['None'])
         self.max_plugins_output_length = g_conf.get('max_plugins_output_length', 8192)
-        print "Max output lenght" , self.max_plugins_output_length
 
         # Set our giving timezone from arbiter
         use_timezone = g_conf['use_timezone']

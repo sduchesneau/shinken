@@ -42,6 +42,7 @@ from timeperiod import Timeperiod, Timeperiods
 from service import Service, Services
 from command import Command, Commands
 from resultmodulation import Resultmodulation, Resultmodulations
+from criticitymodulation import Criticitymodulation, Criticitymodulations
 from escalation import Escalation, Escalations
 from serviceescalation import Serviceescalation, Serviceescalations
 from hostescalation import Hostescalation, Hostescalations
@@ -131,7 +132,7 @@ class Config(Item):
         'log_service_retries':      BoolProp(default='1', class_inherit=[(Service, 'log_retries')]),
         'log_host_retries':         BoolProp(default='1', class_inherit=[(Host, 'log_retries')]),
         'log_event_handlers':       BoolProp(default='1', class_inherit=[(Host, None), (Service, None)]),
-        'log_initial_states':       BoolProp(default='1'),
+        'log_initial_states':       BoolProp(default='1', class_inherit=[(Host, None), (Service, None)]),
         'log_external_commands':    BoolProp(default='1'),
         'log_passive_checks':       BoolProp(default='1'),
         'global_host_event_handler': StringProp(default='', class_inherit=[(Host, 'global_event_handler')]),
@@ -163,18 +164,18 @@ class Config(Item):
         'child_processes_fork_twice': UnusedProp(text='fork twice is not use.'),
         'enable_environment_macros': BoolProp(default='1', class_inherit=[(Host, None), (Service, None)]),
         'enable_flap_detection':    BoolProp(default='1', class_inherit=[(Host, None), (Service, None)]),
-        'low_service_flap_threshold': IntegerProp(default='25', class_inherit=[(Service, 'low_flap_threshold')]),
-        'high_service_flap_threshold': IntegerProp(default='50', class_inherit=[(Service, 'high_flap_threshold')]),
-        'low_host_flap_threshold':  IntegerProp(default='25', class_inherit=[(Host, 'low_flap_threshold')]),
-        'high_host_flap_threshold': IntegerProp(default='50', class_inherit=[(Host, 'high_flap_threshold')]),
+        'low_service_flap_threshold': IntegerProp(default='20', class_inherit=[(Service, 'low_flap_threshold')]),
+        'high_service_flap_threshold': IntegerProp(default='30', class_inherit=[(Service, 'high_flap_threshold')]),
+        'low_host_flap_threshold':  IntegerProp(default='20', class_inherit=[(Host, 'low_flap_threshold')]),
+        'high_host_flap_threshold': IntegerProp(default='30', class_inherit=[(Host, 'high_flap_threshold')]),
         'soft_state_dependencies':  BoolProp(managed=False, default='0'),
-        'service_check_timeout':    IntegerProp(default='10', class_inherit=[(Service, 'check_timeout')]),
-        'host_check_timeout':       IntegerProp(default='10', class_inherit=[(Host, 'check_timeout')]),
-        'event_handler_timeout':    IntegerProp(default='10', class_inherit=[(Host, None), (Service, None)]),
-        'notification_timeout':     IntegerProp(default='5', class_inherit=[(Host, None), (Service, None)]),
-        'ocsp_timeout':             IntegerProp(default='5', class_inherit=[(Service, None)]),
-        'ochp_timeout':             IntegerProp(default='5', class_inherit=[(Host, None)]),
-        'perfdata_timeout':         IntegerProp(default='2', class_inherit=[(Host, None), (Service, None)]),
+        'service_check_timeout':    IntegerProp(default='60', class_inherit=[(Service, 'check_timeout')]),
+        'host_check_timeout':       IntegerProp(default='30', class_inherit=[(Host, 'check_timeout')]),
+        'event_handler_timeout':    IntegerProp(default='30', class_inherit=[(Host, None), (Service, None)]),
+        'notification_timeout':     IntegerProp(default='30', class_inherit=[(Host, None), (Service, None)]),
+        'ocsp_timeout':             IntegerProp(default='15', class_inherit=[(Service, None)]),
+        'ochp_timeout':             IntegerProp(default='15', class_inherit=[(Host, None)]),
+        'perfdata_timeout':         IntegerProp(default='5', class_inherit=[(Host, None), (Service, None)]),
         'obsess_over_services':     BoolProp(default='0', class_inherit=[(Service, 'obsess_over')]),
         'ocsp_command':             StringProp(default='', class_inherit=[(Service, None)]),
         'obsess_over_hosts':        BoolProp(default='0', class_inherit=[(Host, 'obsess_over')]),
@@ -295,6 +296,7 @@ class Config(Item):
         'realm':            (Realm, Realms, 'realms'),
         'module':           (Module, Modules, 'modules'),
         'resultmodulation': (Resultmodulation, Resultmodulations, 'resultmodulations'),
+        'criticitymodulation': (Criticitymodulation, Criticitymodulations, 'criticitymodulations'),
         'escalation':       (Escalation, Escalations, 'escalations'),
         'serviceescalation': (Serviceescalation, Serviceescalations, 'serviceescalations'),
         'hostescalation':   (Hostescalation, Hostescalations, 'hostescalations'),
@@ -318,6 +320,7 @@ class Config(Item):
         #idify this conf
         random.seed(time.time())
         self.magic_hash = random.randint(1, 100000)
+        self.configuration_errors = []
 
 
     # We've got macro in the resource file and we want
@@ -442,7 +445,7 @@ class Config(Item):
                  'servicedependency', 'hostdependency', 'arbiter', 'scheduler',
                  'reactionner', 'broker', 'receiver', 'poller', 'realm', 'module', 
                  'resultmodulation', 'escalation', 'serviceescalation', 'hostescalation',
-                 'discoveryrun', 'discoveryrule']
+                 'discoveryrun', 'discoveryrule', 'criticitymodulation']
         objectscfg = {}
         for t in types:
             objectscfg[t] = []
@@ -584,7 +587,7 @@ class Config(Item):
         self.modules.create_reversed_list()
 
         if len(self.arbiterlinks) == 0:
-            logger.log("Warning : there is no arbiter, I add one in localhost:7770")
+            logger.log("Warning : there is no arbiter, I add one in localhost:7770", print_it=False)
             a = ArbiterLink({'arbiter_name' : 'Default-Arbiter',
                              'host_name' : socket.gethostname(),
                              'address' : 'localhost', 'port' : '7770',
@@ -620,8 +623,8 @@ class Config(Item):
         # link hosts with timeperiods and commands
         self.hosts.linkify(self.timeperiods, self.commands, \
                                self.contacts, self.realms, \
-                               self.resultmodulations, self.escalations,\
-                               self.hostgroups)
+                               self.resultmodulations, self.criticitymodulations, \
+                               self.escalations, self.hostgroups)
 
         # Do the simplify AFTER explode groups
         #print "Hostgroups"
@@ -632,8 +635,8 @@ class Config(Item):
         # link services with other objects
         self.services.linkify(self.hosts, self.commands, \
                                   self.timeperiods, self.contacts,\
-                                  self.resultmodulations, self.escalations,\
-                                  self.servicegroups)
+                                  self.resultmodulations, self.criticitymodulations, \
+                                  self.escalations, self.servicegroups)
 
         #print "Service groups"
         # link servicegroups members with services
@@ -665,6 +668,8 @@ class Config(Item):
         #print "Resultmodulations"
         self.resultmodulations.linkify(self.timeperiods)
 
+        self.criticitymodulations.linkify(self.timeperiods)
+
         #print "Escalations"
         self.escalations.linkify(self.timeperiods, self.contacts, \
                                      self.services, self.hosts)
@@ -684,6 +689,9 @@ class Config(Item):
         self.reactionners.linkify(self.realms, self.modules)
         self.pollers.linkify(self.realms, self.modules)
 
+        # Ok, now update all realms with backlinks of
+        # satellites
+        self.realms.prepare_for_satellites_conf()
 
 
     #Some properties are dangerous to be send like that
@@ -769,10 +777,10 @@ class Config(Item):
         #print "Timeperiods"
         self.timeperiods.explode()
 
-        self.hostdependencies.explode()
+        self.hostdependencies.explode(self.hostgroups)
 
         #print "Servicedependancy"
-        self.servicedependencies.explode()
+        self.servicedependencies.explode(self.hostgroups)
 
         #Serviceescalations hostescalations will create new escalations
         self.serviceescalations.explode(self.escalations)
@@ -837,6 +845,7 @@ class Config(Item):
         self.services.fill_default()
         self.servicegroups.fill_default()
         self.resultmodulations.fill_default()
+        self.criticitymodulations.fill_default()
 
         #Also fill default of host/servicedep objects
         self.servicedependencies.fill_default()
@@ -881,35 +890,35 @@ class Config(Item):
             #so all hosts without realm wil be link with it
             default = Realm({'realm_name' : 'Default', 'default' : '1'})
             self.realms = Realms([default])
-            logger.log("Notice : the is no defined realms, so I add a new one %s" % default.get_name())
+            logger.log("Notice : the is no defined realms, so I add a new one %s" % default.get_name(), print_it=False)
             lists = [self.pollers, self.brokers, self.reactionners, self.receivers, self.schedulerlinks]
             for l in lists:
                 for elt in l:
                     if not hasattr(elt, 'realm'):
                         elt.realm = 'Default'
-                        logger.log("Notice : Tagging %s with realm %s" % (elt.get_name(), default.get_name()))
+                        logger.log("Notice : Tagging %s with realm %s" % (elt.get_name(), default.get_name()), print_it=False)
 
 
     #If a satellite is missing, we add them in the localhost
     #with defaults values
     def fill_default_satellites(self):
         if len(self.schedulerlinks) == 0:
-            logger.log("Warning : there is no scheduler, I add one in localhost:7768")
+            logger.log("Warning : there is no scheduler, I add one in localhost:7768", print_it=False)
             s = SchedulerLink({'scheduler_name' : 'Default-Scheduler',
                                'address' : 'localhost', 'port' : '7768'})
             self.schedulerlinks = SchedulerLinks([s])
         if len(self.pollers) == 0:
-            logger.log("Warning : there is no poller, I add one in localhost:7771")
+            logger.log("Warning : there is no poller, I add one in localhost:7771", print_it=False)
             p = PollerLink({'poller_name' : 'Default-Poller',
                             'address' : 'localhost', 'port' : '7771'})
             self.pollers = PollerLinks([p])
         if len(self.reactionners) == 0:
-            logger.log("Warning : there is no reactionner, I add one in localhost:7769")
+            logger.log("Warning : there is no reactionner, I add one in localhost:7769", print_it=False)
             r = ReactionnerLink({'reactionner_name' : 'Default-Reactionner',
                                  'address' : 'localhost', 'port' : '7769'})
             self.reactionners = ReactionnerLinks([r])
         if len(self.brokers) == 0:
-            logger.log("Warning : there is no broker, I add one in localhost:7772")
+            logger.log("Warning : there is no broker, I add one in localhost:7772", print_it=False)
             b = BrokerLink({'broker_name' : 'Default-Broker',
                             'address' : 'localhost', 'port' : '7772',
                             'manage_arbiters' : '1'})
@@ -1067,17 +1076,17 @@ class Config(Item):
 
         #We add them to the brokers if we need it
         if mod_to_add != []:
-            print "Warning : I autogenerated some Broker modules, please look at your configuration"
+            logger.log("Warning : I autogenerated some Broker modules, please look at your configuration")
             for m in mod_to_add:
-                print "Warning : the module", m.module_name, "is autogenerated"
+                logger.log("Warning : the module %s is autogenerated" % m.module_name)
                 for b in self.brokers:
                     b.modules.append(m)
 
         #Then for schedulers
         if mod_to_add_to_schedulers != []:
-            print "Warning : I autogenerated some Scheduler modules, please look at your configuration"
+            logger.log("Warning : I autogenerated some Scheduler modules, please look at your configuration")
             for m in mod_to_add_to_schedulers:
-                print "Warning : the module", m.module_name, "is autogenerated"
+                logger.log("Warning : the module %s is autogenerated" %  m.module_name)
                 for b in self.schedulerlinks:
                     b.modules.append(m)
 
@@ -1106,9 +1115,9 @@ class Config(Item):
 
         #We add them to the brokers if we need it
         if mod_to_add != []:
-            print "Warning : I autogenerated some Arbiter modules, please look at your configuration"
+            logger.log("Warning : I autogenerated some Arbiter modules, please look at your configuration")
             for (mod, data) in mod_to_add:
-                print "Warning : the module", data['module_name'], "is autogenerated"
+                logger.log("Warning : the module %s is autogenerated" % data['module_name'])
                 for a in self.arbiterlinks:
                     a.modules = ','.join([getattr(a, 'modules', ''), data['module_name']])
                 self.modules.items[mod.id] = mod
@@ -1155,6 +1164,7 @@ class Config(Item):
         self.timeperiods.create_reversed_list()
 #        self.modules.create_reversed_list()
         self.resultmodulations.create_reversed_list()
+        self.criticitymodulations.create_reversed_list()
         self.escalations.create_reversed_list()
         self.discoveryrules.create_reversed_list()
         self.discoveryruns.create_reversed_list()
@@ -1215,7 +1225,7 @@ class Config(Item):
         
         for x in ( 'servicedependencies', 'hostdependencies', 'arbiterlinks', 'schedulerlinks',
                    'reactionners', 'pollers', 'brokers', 'receivers', 'resultmodulations',
-                   'discoveryrules', 'discoveryruns'):
+                   'discoveryrules', 'discoveryruns', 'criticitymodulations'):
             try: cur = getattr(self, x)
             except: continue
             logger.log('Checking %s...' % (x))
@@ -1223,7 +1233,14 @@ class Config(Item):
                 r = False
                 logger.log("\t%s conf incorrect !!" % (x))
             logger.log('\tChecked %d %s' % (len(cur), x))
-    
+
+        # Look that all scheduler got a broker that will take brok.
+        # If there are no, raiea Warning
+        for s in self.schedulerlinks:
+            rea = s.realm
+            if rea:
+                if len(rea.potential_brokers) == 0:
+                    logger.log("Warning : the scheduler %s got no broker in its realm or upper" % s.get_name())
 
         self.conf_is_correct = r
 
@@ -1242,6 +1259,7 @@ class Config(Item):
         self.services.pythonize()
         self.servicedependencies.pythonize()
         self.resultmodulations.pythonize()
+        self.criticitymodulations.pythonize()
         self.escalations.pythonize()
         self.discoveryrules.pythonize()
         self.discoveryruns.pythonize()
@@ -1276,6 +1294,19 @@ class Config(Item):
         self.timeperiods.remove_templates()
         self.discoveryrules.remove_templates()
         self.discoveryruns.remove_templates()
+
+
+    # Add an error in the configuration error list so we can print them
+    #all in one place
+    def add_error(self, txt):
+        err = txt
+        self.configuration_errors.append(err)
+        self.is_correct = False        
+
+    # Now it's time to show all configuration errors
+    def show_errors(self):
+        for err in self.configuration_errors:
+            logger.log(err)
 
 
     #Create packs of hosts and services so in a pack,
@@ -1344,31 +1375,33 @@ class Config(Item):
             g.add_edge(dep, h)
             g.add_edge(h, dep)
 
-        #Access_list from a node il all nodes that are connected
-        #with it : it's a list of ours mini_packs
+        # Access_list from a node il all nodes that are connected
+        # with it : it's a list of ours mini_packs
         tmp_packs = g.get_accessibility_packs()
 
-        #Now We find the default realm (must be unique or
-        #BAD THINGS MAY HAPPEN )
+        # Now We find the default realm (must be unique or
+        # BAD THINGS MAY HAPPEN )
         default_realm = None
         for r in self.realms:
             if hasattr(r, 'default') and r.default:
                 default_realm = r
 
-        #Now we look if all elements of all packs have the
-        #same realm. If not, not good!
+        # Now we look if all elements of all packs have the
+        # same realm. If not, not good!
         for pack in tmp_packs:
             tmp_realms = set()
             for elt in pack:
                 if elt.realm is not None:
                     tmp_realms.add(elt.realm)
             if len(tmp_realms) > 1:
-                logger.log("Error : the realm configuration of yours hosts is not good because there a more than one realm in one pack (host relations) :")
+                self.add_error("Error : the realm configuration of yours hosts is not good because there a more than one realm in one pack (host relations) :")
                 for h in pack:
                     if h.realm is None:
-                        logger.log('Error : the host %s do not have a realm' % h.get_name())
+                        err = '   the host %s do not have a realm' % h.get_name()
+                        self.add_error(err)
                     else:
-                        logger.log('Error : the host %s is in the realm %s' % (h.get_name(), h.realm.get_name()))
+                        err = '   the host %s is in the realm %s' % (h.get_name(), h.realm.get_name())
+                        self.add_error(err)
             if len(tmp_realms) == 1: # Ok, good
                 r = tmp_realms.pop() #There is just one element
                 r.packs.append(pack)
@@ -1376,35 +1409,38 @@ class Config(Item):
                 if default_realm is not None:
                     default_realm.packs.append(pack)
                 else:
-                    logger.log("Error : some hosts do not have a realm and you do not defined a default realm!")
+                    err = "Error : some hosts do not have a realm and you do not defined a default realm!"
+                    self.add_error(err)
                     for h in pack:
-                        logger.log('Host in this pack : %s ' % h.get_name())
+                        err = '    Impacted host: %s ' % h.get_name()
+                        self.add_error(err)
 
-        #The load balancing is for a loop, so all
-        #hosts of a realm (in a pack) will be dispatch
-        #in the schedulers of this realm
-        #REF: doc/pack-agregation.png
+        # The load balancing is for a loop, so all
+        # hosts of a realm (in a pack) will be dispatch
+        # in the schedulers of this realm
+        # REF: doc/pack-agregation.png
         for r in self.realms:
             #print "Load balancing realm", r.get_name()
             packs = {}
-            #create roundrobin iterator for id of cfg
-            #So dispatching is loadbalanced in a realm
-            #but add a entry in the roundrobin tourniquet for
-            #every weight point schedulers (so Weight round robin)
+            # create roundrobin iterator for id of cfg
+            # So dispatching is loadbalanced in a realm
+            # but add a entry in the roundrobin tourniquet for
+            # every weight point schedulers (so Weight round robin)
             weight_list = []
             no_spare_schedulers = [s for s in r.schedulers if not s.spare]
             nb_schedulers = len(no_spare_schedulers)
 
-            #Maybe there is no scheduler in the realm, it's can be a
-            #big problem if there are elements in packs
-            nb_elements = len([elt for elt in [pack for pack in r.packs]])
+            # Maybe there is no scheduler in the realm, it's can be a
+            # big problem if there are elements in packs
+            nb_elements = 0
+            for pack in r.packs:
+                nb_elements += len(pack)
             logger.log("Number of hosts in the realm %s : %d" %(r.get_name(), nb_elements))
 
             if nb_schedulers == 0 and nb_elements != 0:
-                logger.log("ERROR : The realm %s have hosts but no scheduler!" %r.get_name())
+                err = "ERROR : The realm %s have hosts but no scheduler!" %r.get_name()
+                self.add_error(err)
                 r.packs = [] #Dumb pack
-                #The conf is incorrect
-                self.conf_is_correct = False
                 continue
 
             packindex = 0
@@ -1417,18 +1453,18 @@ class Config(Item):
 
             rr = itertools.cycle(weight_list)
 
-            #we must have nb_schedulers packs)
+            # we must have nb_schedulers packs)
             for i in xrange(0, nb_schedulers):
                 packs[i] = []
 
-            #Now we explode the numerous packs into nb_packs reals packs:
-            #we 'load balance' them in a roundrobin way
+            # Now we explode the numerous packs into nb_packs reals packs:
+            # we 'load balance' them in a roundrobin way
             for pack in r.packs:
                 i = rr.next()
                 for elt in pack:
                     packs[packindices[i]].append(elt)
-            #Now in packs we have the number of packs [h1, h2, etc]
-            #equal to the number of schedulers.
+            # Now in packs we have the number of packs [h1, h2, etc]
+            # equal to the number of schedulers.
             r.packs = packs
 
 
@@ -1439,7 +1475,7 @@ class Config(Item):
     # That can be need is macro in commands
     def cut_into_parts(self):
         #print "Scheduler configurated :", self.schedulerlinks
-        #I do not care about alive or not. User must have set a spare if need it
+        # I do not care about alive or not. User must have set a spare if need it
         nb_parts = len([s for s in self.schedulerlinks if not s.spare])
 
         if nb_parts == 0:
@@ -1456,9 +1492,6 @@ class Config(Item):
 
             #Now we copy all properties of conf into the new ones
             for prop, entry in Config.properties.items():
-#               if not 'usage' in entry \
-#               or not (entry['usage'] == 'unused' \
-#               or  entry['usage'] == 'unmanaged'):
                 if entry.managed and not isinstance(entry, UnusedProp):
                     val = getattr(self, prop)
                     setattr(cur_conf, prop, val)
@@ -1492,14 +1525,14 @@ class Config(Item):
 
         logger.log("Creating packs for realms")
 
-        #Just create packs. There can be numerous ones
-        #In pack we've got hosts and service
-        #packs are in the realms
-        #REF: doc/pack-creation.png
+        # Just create packs. There can be numerous ones
+        # In pack we've got hosts and service
+        # packs are in the realms
+        # REF: doc/pack-creation.png
         self.create_packs(nb_parts)
 
-        #We've got all big packs and get elements into configurations
-        #REF: doc/pack-agregation.png
+        # We've got all big packs and get elements into configurations
+        # REF: doc/pack-agregation.png
         offset = 0
         for r in self.realms:
             for i in r.packs:
@@ -1508,24 +1541,24 @@ class Config(Item):
                     self.confs[i+offset].hosts.append(h)
                     for s in h.services:
                         self.confs[i+offset].services.append(s)
-                #Now the conf can be link in the realm
+                # Now the conf can be link in the realm
                 r.confs[i+offset] = self.confs[i+offset]
             offset += len(r.packs)
             del r.packs
 
-        #We've nearly have hosts and services. Now we want REALS hosts (Class)
-        #And we want groups too
-        #print "Finishing packs"
+        # We've nearly have hosts and services. Now we want REALS hosts (Class)
+        # And we want groups too
+        # print "Finishing packs"
         for i in self.confs:
             #print "Finishing pack Nb:", i
             cfg = self.confs[i]
 
-            #Create ours classes
+            # Create ours classes
             cfg.hosts = Hosts(cfg.hosts)
             cfg.hosts.create_reversed_list()
             cfg.services = Services(cfg.services)
             cfg.services.create_reversed_list()
-            #Fill host groups
+            # Fill host groups
             for ori_hg in self.hostgroups:
                 hg = cfg.hostgroups.find_by_name(ori_hg.get_name())
                 mbrs = ori_hg.members
@@ -1536,7 +1569,7 @@ class Config(Item):
                 for h in cfg.hosts:
                     if h.id in mbrs_id:
                         hg.members.append(h)
-            #Fill servicegroup
+            # Fill servicegroup
             for ori_sg in self.servicegroups:
                 sg = cfg.servicegroups.find_by_name(ori_sg.get_name())
                 mbrs = ori_sg.members
@@ -1548,14 +1581,14 @@ class Config(Item):
                     if s.id in mbrs_id:
                         sg.members.append(s)
 
-        #Now we fill other_elements by host (service are with their host
-        #so they are not tagged)
+        # Now we fill other_elements by host (service are with their host
+        # so they are not tagged)
         for i in self.confs:
             for h in self.confs[i].hosts:
                 for j in [j for j in self.confs if j != i]: #So other than i
                     self.confs[i].other_elements[h.get_name()] = i
 
-        #We tag conf with instance_id
+        # We tag conf with instance_id
         for i in self.confs:
             self.confs[i].instance_id = i
             random.seed(time.time())
