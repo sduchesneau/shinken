@@ -9,7 +9,7 @@ Homepage: http://www.shinken-monitoring.org/
 #Vcs-Browser: http://git.debian.org/?p=collab-maint/shinken.git;a=summary
 
 Package: shinken
-Architecture: any
+Architecture: all
 Depends: shinken-arbiter (= ${source:Version}), shinken-broker (= ${source:Version}), shinken-discovery (= ${source:Version}), shinken-poller (= ${source:Version}), shinken-reactionner (= ${source:Version}), shinken-receiver (= ${source:Version}), shinken-scheduler (= ${source:Version}), ${shlibs:Depends}, ${misc:Depends}
 Description: Flexible monitoring tool - Meta-package
  This package installs all components for shinken.
