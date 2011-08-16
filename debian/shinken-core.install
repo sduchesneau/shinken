@@ -67,3 +67,5 @@ debian/config-files/etc/shinken/                                                
 
 debian/tmp/etc/init.d/shinken                                                                  /etc/init.d
 
+libexec/*.sh                                                                                   /usr/lib/shinken/plugins
+libexec/*.py                                                                                   /usr/lib/shinken/plugins
