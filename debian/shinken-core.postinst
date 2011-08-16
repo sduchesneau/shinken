@@ -38,6 +38,9 @@ case "$1" in
     rm -rf $TMP
     unset TMP
 
+    ## Ensure /var/run/shinken is ready
+    mkdir -p /var/run/shinken
+
     ## Checks rights
     dpkg-statoverride --remove /var/run/shinken/ >/dev/null 2>&1 || true
     dpkg-statoverride --update --add shinken shinken 02750 /var/run/shinken/ >/dev/null 2>&1 || true

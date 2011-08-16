@@ -18,6 +18,9 @@ case "$1" in
     dpkg-statoverride --remove /var/run/shinken
     dpkg-statoverride --remove /var/log/shinken
 
+    ## Ensure /var/run/shinken is removed
+    rm -rf /var/run/shinken || return 0
+
     ;;
   purge)
     # This package has previously been removed and is now having
