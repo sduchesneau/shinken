@@ -24,7 +24,7 @@ binary:
 	dh_auto_install
 	
 	# Fix debian paths
-	sed -i -r 's#/tmp/shinken-building/shinken-0.6.4/debian/tmp##' \
+	sed -i -r "s#$(CURDIR)/debian/tmp##" \
 	  debian/tmp/etc/shinken/*.ini \
 	  debian/tmp/etc/shinken/*.cfg \
 	  debian/tmp/etc/default/shinken
