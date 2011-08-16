@@ -19,7 +19,11 @@ set -e
 
 case "$1" in
     remove|upgrade|deconfigure)
-        /etc/init.d/shinken-poller stop
+        if which invoke-rc.d >/dev/null 2>&1; then
+            invoke-rc.d shinken-poller stop
+        else
+            /etc/init.d/shinken-poller stop
+        fi
         ;;
     failed-upgrade)
         ;;
