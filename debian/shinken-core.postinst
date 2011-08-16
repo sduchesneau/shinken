@@ -25,6 +25,9 @@ case "$1" in
     chgrp shinken $TMP 2>/dev/null ||
       addgroup --system shinken
 
+    ## Ensure /var/lib/shinken is ready
+    mkdir -p /var/lib/shinken
+
     ## Adds shinken user
     chown shinken $TMP 2>/dev/null ||
       adduser --ingroup shinken --no-create-home --system --home /var/lib/shinken shinken
@@ -46,6 +49,8 @@ case "$1" in
     dpkg-statoverride --update --add shinken shinken 02750 /var/run/shinken/ >/dev/null 2>&1 || true
     dpkg-statoverride --remove /var/log/shinken/ >/dev/null 2>&1 || true
     dpkg-statoverride --update --add shinken shinken 02750 /var/log/shinken/ >/dev/null 2>&1 || true
+    dpkg-statoverride --remove /var/lib/shinken/ >/dev/null 2>&1 || true
+    dpkg-statoverride --update --add shinken shinken 02750 /var/lib/shinken/ >/dev/null 2>&1 || true
 
     ## Ensure shinken starts automatically
     update-rc.d shinken defaults >/dev/null

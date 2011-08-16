@@ -17,9 +17,11 @@ case "$1" in
     ## Removes directory stat
     dpkg-statoverride --remove /var/run/shinken
     dpkg-statoverride --remove /var/log/shinken
+    dpkg-statoverride --remove /var/lib/shinken
 
     ## Ensure /var/run/shinken is removed
     rm -rf /var/run/shinken || return 0
+    rm -rf /var/lib/shinken || return 0
 
     ;;
   purge)
