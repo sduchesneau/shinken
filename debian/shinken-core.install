@@ -56,7 +56,6 @@ debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/nsca.py              
 debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/pickle_retention_file_generic.py    /usr/lib/python2.6/dist-packages/shinken/modules/
 
 
-debian/tmp/usr/lib/python2.6/dist-packages/skonf                                               /usr/lib/python2.6/dist-packages/
 
 debian/tmp/usr/lib/python2.6/dist-packages/Shinken-0.6.egg-info                                /usr/lib/python2.6/dist-packages/
 
