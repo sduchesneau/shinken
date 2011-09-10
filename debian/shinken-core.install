@@ -1,5 +1,7 @@
 debian/tmp/usr/lib/python2.6/dist-packages/shinken/*.py                                        /usr/lib/python2.6/dist-packages/shinken/
 
+debian/tmp/usr/lib/python2.6/dist-packages/shinken/objects/*.py                                /usr/lib/python2.6/dist-packages/shinken/objects/
+
 debian/tmp/usr/lib/python2.6/dist-packages/shinken/daemons/__init__.py                         /usr/lib/python2.6/dist-packages/shinken/daemons/
 
 debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/__init__.py                         /usr/lib/python2.6/dist-packages/shinken/modules/
