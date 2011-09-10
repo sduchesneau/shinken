@@ -1,3 +1,10 @@
+shinken (0.6.5-2) unstable; urgency=low
+
+  * Fix for pid and log handling by sduchesneau
+  * Bugfix: include objects/*.py in distribtion by sduchesneau
+
+ -- Arthur Gautier <superbaloo@desktop.vm.superbaloo.net>  Sat, 10 Sep 2011 18:48:03 +0200
+
 shinken (0.6.5-1) unstable; urgency=low
 
   * Version bump to 0.6.5
