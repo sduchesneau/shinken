@@ -63,6 +63,7 @@ Description: Flexible monitoring - Discovery module
 Package: shinken-poller
 Architecture: all
 Depends: python (>= 2.5), shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Suggests: nagios-plugins-basic
 Description: Flexible monitoring - Poller module
  Poller module for shinken monitoring
  Shinken is a new, Nagios compatible monitoring tool, written in Python. The

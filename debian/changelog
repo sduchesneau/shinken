@@ -1,3 +1,9 @@
+shinken (0.6.5-3) unstable; urgency=low
+
+  * Suggests nagios-plugins-basic
+
+ -- Arthur Gautier <superbaloo+debian@superbaloo.net>  Sun, 11 Sep 2011 15:43:51 +0200
+
 shinken (0.6.5-2) unstable; urgency=low
 
   * Fix for pid and log handling by sduchesneau
