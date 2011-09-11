@@ -59,7 +59,7 @@ else:
 # The standard I/O file descriptors are redirected to /dev/null by default.
 REDIRECT_TO = getattr(os, "devnull", "/dev/null")
 
-UMASK = 0
+UMASK = 027
 from shinken.bin import VERSION
 
 
@@ -422,11 +422,12 @@ Keep in self.fpid the File object to the pidfile. Will be used by writepid.
         del self.debug_output
 
 
-    def do_daemon_init_and_start(self):
+    def do_daemon_init_and_start(self, use_pyro=True):
         self.change_to_user_group()
         self.change_to_workdir()
         self.check_parallel_run()
-        self.setup_pyro_daemon()
+        if use_pyro:
+            self.setup_pyro_daemon()
         # Then start to log all in the local file if asked so
         self.register_local_log()
         if self.is_daemon:
@@ -462,10 +463,14 @@ Keep in self.fpid the File object to the pidfile. Will be used by writepid.
             else:
                 Pyro.config.PYROSSL_POSTCONNCHECK=0
 
-        # create the server
-        Pyro.config.PYRO_STORAGE = "."
-        Pyro.config.PYRO_COMPRESSION = 1
-        Pyro.config.PYRO_MULTITHREADED = 0        
+        # create the server, but Pyro > 4.8 veersion
+        # do not have such objets...
+        try:
+            Pyro.config.PYRO_STORAGE = "."
+            Pyro.config.PYRO_COMPRESSION = 1
+            Pyro.config.PYRO_MULTITHREADED = 0        
+        except:
+            pass
 
         self.pyro_daemon = pyro.ShinkenPyroDaemon(self.host, self.port, ssl_conf.use_ssl) 
 

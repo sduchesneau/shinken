@@ -59,7 +59,8 @@ from shinken.basemodule import BaseModule
 from shinken.message import Message
 from shinken.sorteddict import SortedDict
 
-from livestatus import LiveStatus, LOGCLASS_ALERT, LOGCLASS_PROGRAM, LOGCLASS_NOTIFICATION, LOGCLASS_PASSIVECHECK, LOGCLASS_COMMAND, LOGCLASS_STATE, LOGCLASS_INVALID, LOGOBJECT_INFO, LOGOBJECT_HOST, LOGOBJECT_SERVICE, Logline
+from livestatus import LiveStatus
+from log_line import LOGCLASS_ALERT, LOGCLASS_PROGRAM, LOGCLASS_NOTIFICATION, LOGCLASS_PASSIVECHECK, LOGCLASS_COMMAND, LOGCLASS_STATE, LOGCLASS_INVALID, LOGOBJECT_INFO, LOGOBJECT_HOST, LOGOBJECT_SERVICE, Logline
 
 
 properties = {
@@ -100,6 +101,7 @@ class Livestatus_broker(BaseModule):
         self.pollers = SortedDict()
         self.reactionners = SortedDict()
         self.brokers = SortedDict()
+        self.service_id_cache = {}
 
         self.instance_ids = []
 
@@ -118,11 +120,7 @@ class Livestatus_broker(BaseModule):
         #external commands to the broker
         #self.from_q = self.properties['from_queue']
 
-        self.prepare_log_db()
         self.prepare_pnp_path()
-
-
-        self.livestatus = LiveStatus(self.configs, self.hosts, self.services, self.contacts, self.hostgroups, self.servicegroups, self.contactgroups, self.timeperiods, self.commands, self.schedulers, self.pollers, self.reactionners, self.brokers, self.dbconn, self.pnp_path, self.from_q)
 
         m = MacroResolver()
         m.output_macros = ['HOSTOUTPUT', 'HOSTPERFDATA', 'HOSTACKAUTHOR', 'HOSTACKCOMMENT', 'SERVICEOUTPUT', 'SERVICEPERFDATA', 'SERVICEACKAUTHOR', 'SERVICEACKCOMMENT']
@@ -304,6 +302,9 @@ class Livestatus_broker(BaseModule):
             dtc.ref = s
         self.services[host_name+service_description] = s
         self.number_of_objects += 1
+        # We need this for manage_initial_servicegroup_status_brok where it
+        # will speed things up dramatically
+        self.service_id_cache[s.id] = s
 
 
     #In fact, an update of a service is like a check return
@@ -349,12 +350,12 @@ class Livestatus_broker(BaseModule):
         for (s_id, s_name) in members:
             # A direct lookup by s_host_name+s_name is not possible
             # because we don't have the host_name in members, only ids.
-            for s in self.services.values():
-                if s_id == s.id:
-                    sg.members.append(s)
-                    sg.members = list(set(sg.members))
-                    break
-                
+            try:
+                sg.members.append(self.service_id_cache[s_id])
+            except Exception:
+                pass
+
+        sg.members = list(set(sg.members))
         self.servicegroups[servicegroup_name] = sg
         self.number_of_objects += 1
 
@@ -545,7 +546,9 @@ class Livestatus_broker(BaseModule):
     #A log brok will be written into a database
     def manage_log_brok(self, b):
         data = b.data
+
         line = data['log'].encode('UTF-8').rstrip()
+
         # split line and make sql insert
         #print "LOG--->", line
         # [1278280765] SERVICE ALERT: test_host_0
@@ -686,7 +689,7 @@ class Livestatus_broker(BaseModule):
                         self.dbcursor.execute('INSERT INTO LOGS VALUES(%(0)s, %(1)s, %(2)s, %(3)s, %(4)s, %(5)s, %(6)s, %(7)s, %(8)s, %(9)s, %(10)s, %(11)s, %(12)s, %(13)s, %(14)s, %(15)s)', values)
                     else:
                         self.dbcursor.execute('INSERT INTO LOGS VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', values)
-                    self.dbconn.commit()
+                    #self.dbconn.commit()
             except sqlite3.Error, e:
                 print "An error occurred:", e.args[0]
                 print "DATABASE ERROR!!!!!!!!!!!!!!!!!"
@@ -746,6 +749,8 @@ class Livestatus_broker(BaseModule):
         # create db file and tables if not existing
         self.dbconn = sqlite3.connect(self.database_file)
         self.dbcursor = self.dbconn.cursor()
+        # Get no rpoblem for utf8 insert
+        self.dbconn.text_factory = str
         # 'attempt', 'class', 'command_name', 'comment', 'contact_name', 'host_name', 'lineno', 'message',
         # 'options', 'plugin_output', 'service_description', 'state', 'state_type', 'time', 'type',
         cmd = "CREATE TABLE IF NOT EXISTS logs(logobject INT, attempt INT, class INT, command_name VARCHAR(64), comment VARCHAR(256), contact_name VARCHAR(64), host_name VARCHAR(64), lineno INT, message VARCHAR(512), options VARCHAR(512), plugin_output VARCHAR(256), service_description VARCHAR(64), state INT, state_type VARCHAR(10), time INT, type VARCHAR(64))"
@@ -756,6 +761,14 @@ class Livestatus_broker(BaseModule):
         self.dbcursor.execute(cmd)
         self.dbconn.commit()
         # rowfactory will later be redefined (in livestatus.py)
+        self.next_log_db_commit = time.time() + 1
+
+
+    def commit_log_db(self):
+        now = time.time()
+        if self.next_log_db_commit <= now:
+            self.dbconn.commit()
+            self.next_log_db_commit = now + 1
 
 
     def cleanup_log_db(self):
@@ -814,6 +827,8 @@ class Livestatus_broker(BaseModule):
 
     def main(self):
         try:
+            #import cProfile
+            #cProfile.runctx('''self.do_main()''', globals(), locals(),'/tmp/livestatus.profile')
             self.do_main()
         except Exception, exp:
             
@@ -832,6 +847,12 @@ class Livestatus_broker(BaseModule):
         # Maybe we got a debug dump to do
         if self.debug:
             self.set_debug()
+
+        # Open the logging database
+        self.prepare_log_db()
+
+        # This is the main object of this broker where the action takes place
+        self.livestatus = LiveStatus(self.configs, self.hosts, self.services, self.contacts, self.hostgroups, self.servicegroups, self.contactgroups, self.timeperiods, self.commands, self.schedulers, self.pollers, self.reactionners, self.brokers, self.dbconn, self.pnp_path, self.from_q)
 
         last_number_of_objects = 0
         last_db_cleanup_time = 0
@@ -872,6 +893,11 @@ class Livestatus_broker(BaseModule):
             except Exception, exp:
                 print "Error : got an exeption (bad code?)", exp.__dict__, type(exp)
                 raise
+
+            # Commit log broks to the database
+            self.commit_log_db()
+
+            # Check for pending livestatus requests
             inputready,outputready,exceptready = select.select(self.input,[],[], 0)
 
             now = time.time()

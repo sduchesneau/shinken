@@ -182,9 +182,13 @@ Like temporary attributes such as "imported_from", etc.. """
 #                else: #new style for service
                 new_val = tab.pythonize(getattr(self, prop))
                 setattr(self, prop, new_val)
-            except AttributeError , exp:
-                # print self.get_name(), ' : ', exp
+            except AttributeError, exp:
+                #print exp
                 pass # Will be catch at the is_correct moment
+            except KeyError, exp:
+                #print "Missing prop value", exp
+                err = "ERROR : the property '%s' of '%s' do not have value" % (prop, self.get_name())
+                self.configuration_errors.append(err)
 
 
     def get_templates(self):
@@ -529,8 +533,10 @@ class Items(object):
 
 
     def __delitem__(self, key):
-        del self.items[key]
-
+        try:
+            del self.items[key]
+        except KeyError: #we don't want it, we do not have it. All is perfect
+            pass
 
     def __setitem__(self, key, value):
         self.items[key] = value
@@ -578,6 +584,13 @@ class Items(object):
             return self.items[id]
         else:
             return None
+
+
+    # It's used to change old Nagios2 names to
+    # Nagios3 ones
+    def old_properties_names_to_new(self):
+        for i in self:
+            i.old_properties_names_to_new()
 
 
     def pythonize(self):
@@ -772,22 +785,22 @@ class Items(object):
                 i.resultmodulations = new_resultmodulations
 
 
-    # Make link between item and it's resultmodulations
-    def linkify_with_criticitymodulations(self, criticitymodulations):
+    # Make link between item and it's business_impact_modulations
+    def linkify_with_business_impact_modulations(self, business_impact_modulations):
         for i in self:
-            if hasattr(i, 'criticitymodulations'):
-                criticitymodulations_tab = i.criticitymodulations.split(',')
-                criticitymodulations_tab = strip_and_uniq(criticitymodulations_tab)
-                new_criticitymodulations = []
-                for rm_name in criticitymodulations_tab:
-                    rm = criticitymodulations.find_by_name(rm_name)
+            if hasattr(i, 'business_impact_modulations'):
+                business_impact_modulations_tab = i.business_impact_modulations.split(',')
+                business_impact_modulations_tab = strip_and_uniq(business_impact_modulations_tab)
+                new_business_impact_modulations = []
+                for rm_name in business_impact_modulations_tab:
+                    rm = business_impact_modulations.find_by_name(rm_name)
                     if rm is not None:
-                        new_criticitymodulations.append(rm)
+                        new_business_impact_modulations.append(rm)
                     else:
-                        err = "The criticity modulation '%s'defined on the %s '%s' do not exist" % (rm_name, i.__class__.my_type, i.get_name())
+                        err = "The business impact modulation '%s'defined on the %s '%s' do not exist" % (rm_name, i.__class__.my_type, i.get_name())
                         i.configuration_errors.append(err)
                         continue
-                i.criticitymodulations = new_criticitymodulations
+                i.business_impact_modulations = new_business_impact_modulations
 
 
 

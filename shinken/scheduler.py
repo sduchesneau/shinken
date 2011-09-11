@@ -43,7 +43,7 @@ from shinken.contactdowntime import ContactDowntime
 from shinken.comment import Comment
 from shinken.acknowledge import Acknowledge
 from shinken.log import logger
-from shinken.util import nighty_five_percent
+from shinken.util import nighty_five_percent, safe_print
 from shinken.load import Load
 
 class Scheduler:
@@ -84,8 +84,8 @@ class Scheduler:
             # clean some times possibel overriden Queues, to do not explode in memory usage
             # every 1/4 of hour
             14 : ('clean_queues', self.clean_queues, 1),
-            # Look for new criticity change by modulation every minute
-            15 : ('update_criticities', self.update_criticities, 60),
+            # Look for new business_impact change by modulation every minute
+            15 : ('update_business_values', self.update_business_values, 60),
         }
 
         # stats part
@@ -187,7 +187,7 @@ class Scheduler:
 
     # We've got activity in the fifo, we get and run commands
     def run_external_command(self, command):
-        print "scheduler resolves command", command
+        safe_print("scheduler resolves command", command)
         ext_cmd = ExternalCommand(command)
         self.external_command.resolve_command(ext_cmd)
 
@@ -378,19 +378,19 @@ class Scheduler:
             self.comments[c_id].ref.del_comment(c_id)
             del self.comments[c_id]
 
-    # We update all criticity for looking at new modulation
+    # We update all business_impact for looking at new modulation
     # start for impacts, and so update broks status and
     # problems value too
-    def update_criticities(self):
+    def update_business_values(self):
         for t in [self.hosts, self.services]:
             # We first update impacts and classic elements
             for i in [i for i in t if not i.is_problem]:
-                was = i.criticity
-                i.update_criticity_value()
-                new = i.criticity
-                # Ok, the criticity change, we can update the broks
+                was = i.business_impact
+                i.update_business_impact_value()
+                new = i.business_impact
+                # Ok, the business_impact change, we can update the broks
                 if new != was:
-                    #print "The elements", i.get_name(), "change it's criticity value"
+                    #print "The elements", i.get_name(), "change it's business_impact value"
                     self.get_and_register_status_brok(i)
                     
         # When all impacts and classic elements are updated,
@@ -399,13 +399,13 @@ class Scheduler:
         for t in [self.hosts, self.services]:
             # We first update impacts and classic elements
             for i in [i for i in t if i.is_problem]:
-                was = i.criticity
-                i.update_criticity_value()
-                new = i.criticity
-                # Maybe one of the impacts change it's criticity to a high value
+                was = i.business_impact
+                i.update_business_impact_value()
+                new = i.business_impact
+                # Maybe one of the impacts change it's business_impact to a high value
                 # and so ask for the problem to raise too
                 if new != was:
-                    #print "The elements", i.get_name(), "change it's criticity value from", was, "to", new 
+                    #print "The elements", i.get_name(), "change it's business_impact value from", was, "to", new 
                     self.get_and_register_status_brok(i)
 
 
@@ -523,14 +523,17 @@ class Scheduler:
                 item.remove_in_progress_notification(c)
                 self.actions[c.id].status = 'zombie'
                 item.last_notification = c.check_time
-                #If we' ve got a problem with the notification, raise a Warning log
+
+                # If we' ve got a problem with the notification, raise a Warning log
                 if timeout:
                     logger.log("Warning: Contact %s %s notification command '%s ' timed out after %d seconds" % (self.actions[c.id].contact.contact_name, self.actions[c.id].ref.__class__.my_type, self.actions[c.id].command, int(execution_time)))
                 elif c.exit_status != 0:
                     logger.log("Warning : the notification command '%s' raised an error (exit code=%d) : '%s'" % (c.command, c.exit_status, c.output))
             except KeyError , exp: #bad number for notif, not so terrible
+                #print exp
                 pass
-            except AttributeError: # bad object, drop it
+            except AttributeError, exp: # bad object, drop it
+                #print exp
                 pass
 
 

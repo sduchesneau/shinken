@@ -106,6 +106,7 @@ class Service(SchedulingItem):
         'action_url':             StringProp (default='', fill_brok=['full_status']),
         'icon_image':             StringProp (default='', fill_brok=['full_status']),
         'icon_image_alt':         StringProp (default='', fill_brok=['full_status']),
+        'icon_set':               StringProp (default='', fill_brok=['full_status']),
         'failure_prediction_enabled': BoolProp(default='0', fill_brok=['full_status']),
         'parallelize_check':       BoolProp  (default='1', fill_brok=['full_status']),
 
@@ -113,7 +114,7 @@ class Service(SchedulingItem):
         'poller_tag':              StringProp(default='None'),
         'reactionner_tag':              StringProp(default='None'),
         'resultmodulations':       StringProp(default=''),
-        'criticitymodulations':    StringProp(default=''),
+        'business_impact_modulations':    StringProp(default=''),
         'escalations':             StringProp(default='', fill_brok=['full_status']),
         'maintenance_period':      StringProp(default='', fill_brok=['full_status']),
 
@@ -121,8 +122,8 @@ class Service(SchedulingItem):
         'duplicate_foreach':       StringProp(default=''),
         'default_value':           StringProp(default=''),
 
-        # Criticity value
-        'criticity':               IntegerProp(default='2', fill_brok=['full_status']),
+        # Business_Impact value
+        'business_impact':               IntegerProp(default='2', fill_brok=['full_status']),
     })
 
     # properties used in the running state
@@ -133,7 +134,7 @@ class Service(SchedulingItem):
         'in_checking':        BoolProp   (default=False, fill_brok=['full_status', 'check_result', 'next_schedule'], retention=True),
         'latency':            FloatProp  (default=0, fill_brok=['full_status', 'check_result'], retention=True,),
         'attempt':            IntegerProp(default=0, fill_brok=['full_status', 'check_result'],retention=True),
-        'state':              StringProp (default='PENDING', fill_brok=['full_status'], retention=True),
+        'state':              StringProp (default='PENDING', fill_brok=['full_status', 'check_result'], retention=True),
         'state_id':           IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
         'current_event_id':   IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
         'last_event_id':      IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
@@ -149,7 +150,7 @@ class Service(SchedulingItem):
         'last_time_critical': IntegerProp(default=int(time.time()), fill_brok =['full_status', 'check_result'], retention=True),
         'last_time_unknown':  IntegerProp(default=int(time.time()), fill_brok=['full_status', 'check_result'], retention=True),
         'duration_sec':       IntegerProp(default=0, fill_brok=['full_status'], retention=True),
-        'state_type':         StringProp (default='HARD', fill_brok=['full_status'], retention=True),
+        'state_type':         StringProp (default='HARD', fill_brok=['full_status', 'check_result'], retention=True),
         'state_type_id':      IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
         'output':             StringProp (default='', fill_brok=['full_status', 'check_result'], retention=True),
         'long_output':        StringProp (default='', fill_brok=['full_status', 'check_result'], retention=True),
@@ -206,8 +207,8 @@ class Service(SchedulingItem):
         # Problem/impact part
         'is_problem':         BoolProp   (default=False, fill_brok=['full_status']),
         'is_impact':          BoolProp   (default=False, fill_brok=['full_status']),
-        # the save value of our criticity for "problems"
-        'my_own_criticity':   IntegerProp(default=-1),
+        # the save value of our business_impact for "problems"
+        'my_own_business_impact':   IntegerProp(default=-1, fill_brok=['full_status']),
         # list of problems that make us an impact
         'source_problems':    ListProp   (default=[], fill_brok=['full_status'], brok_transformation=to_svc_hst_distinct_lists),
         # list of the impact I'm the cause of
@@ -289,10 +290,13 @@ class Service(SchedulingItem):
     }
 
     # This tab is used to transform old parameters name into new ones
-    # so from Nagios2 format, to Nagios3 ones
+    # so from Nagios2 format, to Nagios3 ones.
+    # Or Shinken deprecated names like criticity
     old_properties = {
         'normal_check_interval':    'check_interval',
-        'retry_check_interval':     'retry_interval'
+        'retry_check_interval' :    'retry_interval',
+        'criticity'            :    'business_impact',
+#        'criticitymodulations' :    'business_impact_modulations',
     }
 
 ####### 
@@ -323,6 +327,14 @@ class Service(SchedulingItem):
     # Need the whole name for debugin purpose
     def get_dbg_name(self):
         return "%s/%s" % (self.host.host_name, self.service_description)
+
+    def get_full_name(self):
+        return "%s/%s" % (self.host.host_name, self.service_description)
+
+
+    # Get our realm, so in fact our host one
+    def get_realm(self):
+        return self.host.get_realm()
 
 
     # Check is required prop are set:
@@ -770,7 +782,7 @@ class Service(SchedulingItem):
 
     # See if the notification is launchable (time is OK and contact is OK too)
     def notification_is_blocked_by_contact(self, n, contact):
-        return not contact.want_service_notification(self.last_chk, self.state, n.type, self.criticity)
+        return not contact.want_service_notification(self.last_chk, self.state, n.type, self.business_impact)
 
 
     def get_duration_sec(self):
@@ -962,7 +974,7 @@ class Services(Items):
     # service -> timepriods
     # service -> contacts
     def linkify(self, hosts, commands, timeperiods, contacts,
-                resultmodulations, criticitymodulations, escalations,
+                resultmodulations, businessimpactmodulations, escalations,
                 servicegroups):
         self.linkify_with_timeperiods(timeperiods, 'notification_period')
         self.linkify_with_timeperiods(timeperiods, 'check_period')
@@ -973,7 +985,7 @@ class Services(Items):
         self.linkify_one_command_with_commands(commands, 'event_handler')
         self.linkify_with_contacts(contacts)
         self.linkify_with_resultmodulations(resultmodulations)
-        self.linkify_with_criticitymodulations(criticitymodulations)
+        self.linkify_with_business_impact_modulations(businessimpactmodulations)
         # WARNING: all escalations will not be link here
         # (just the escalation here, not serviceesca or hostesca).
         # This last one will be link in escalations linkify.
@@ -1038,20 +1050,13 @@ class Services(Items):
             del self.items[id]
 
 
-    # It's used to change old Nagios2 names to
-    # Nagios3 ones
-    def old_properties_names_to_new(self):
-        for s in self:
-            s.old_properties_names_to_new()
-
-
     # Apply implicit inheritance for special properties:
     # contact_groups, notification_interval , notification_period
     # So service will take info from host if necessery
     def apply_implicit_inheritance(self, hosts):
         for prop in ( 'contacts', 'contact_groups', 'notification_interval',
-                         'notification_period', 'resultmodulations', 'criticitymodulations', 'escalations',
-                         'poller_tag', 'reactionner_tag', 'check_period', 'criticity' ):
+                         'notification_period', 'resultmodulations', 'business_impact_modulations', 'escalations',
+                         'poller_tag', 'reactionner_tag', 'check_period', 'business_impact' ):
             for s in self:
                 if not s.is_tpl():
                     if not hasattr(s, prop) and hasattr(s, 'host_name'):

@@ -46,6 +46,8 @@ from shinken.daemons.schedulerdaemon import Shinken
 from shinken.daemons.brokerdaemon import Broker
 from shinken.daemons.arbiterdaemon import Arbiter
 
+from shinken.misc.regenerator import Regenerator
+
 class ShinkenTest(unittest.TestCase):
     def setUp(self):
         self.setup_with_file('etc/nagios_1r_1h_1s.cfg')
@@ -65,6 +67,7 @@ class ShinkenTest(unittest.TestCase):
         self.conf.create_objects_for_type(raw_objects, 'module')
         self.conf.early_arbiter_linking()
         self.conf.create_objects(raw_objects)
+        self.conf.old_properties_names_to_new()
         self.conf.instance_id = 0
         self.conf.instance_name = 'test'
         self.conf.linkify_templates()
@@ -75,6 +78,7 @@ class ShinkenTest(unittest.TestCase):
         self.conf.apply_implicit_inheritance()
         self.conf.fill_default()
         self.conf.remove_templates()
+        self.conf.create_reversed_list()
         self.conf.pythonize()
         self.conf.linkify()
         self.conf.apply_dependancies()

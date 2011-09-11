@@ -98,6 +98,16 @@ class IForArbiter(Interface):
         return []
 
 
+    def get_all_states(self):
+        res = {'arbiter' : self.app.conf.arbiterlinks,
+               'scheduler' : self.app.conf.schedulerlinks,
+               'poller' : self.app.conf.pollers,
+               'reactionner' : self.app.conf.reactionners,
+               'receiver' : self.app.conf.receivers,
+               'broker' : self.app.conf.brokers}
+        return res
+
+
 # Main Arbiter Class
 class Arbiter(Daemon):
 
@@ -312,6 +322,10 @@ class Arbiter(Daemon):
         
         # Remove templates from config
         self.conf.remove_templates()
+
+        # We removed templates, and so we must recompute the
+        # search lists
+        self.conf.create_reversed_list()
         
         # Pythonize values
         self.conf.pythonize()
@@ -388,7 +402,12 @@ class Arbiter(Daemon):
         self.user = self.conf.shinken_user
         self.group = self.conf.shinken_group
         
-        self.workdir = os.path.abspath(os.path.dirname(self.pidfile))
+        # If the user set a workdir, let use it. If not, use the
+        # pidfile directory
+        if self.conf.workdir == '':
+            self.workdir = os.path.abspath(os.path.dirname(self.pidfile))
+        else:
+            self.workdir = self.conf.workdir
         #print "DBG curpath=", os.getcwd()
         #print "DBG pidfile=", self.pidfile
         #print "DBG workdir=", self.workdir

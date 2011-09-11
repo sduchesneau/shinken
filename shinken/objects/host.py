@@ -103,6 +103,7 @@ class Host(SchedulingItem):
         'action_url':           StringProp(default='', fill_brok=['full_status']),
         'icon_image':           StringProp(default='', fill_brok=['full_status']),
         'icon_image_alt':       StringProp(default='', fill_brok=['full_status']),
+        'icon_set':             StringProp (default='', fill_brok=['full_status']),
         'vrml_image':           StringProp(default='', fill_brok=['full_status']),
         'statusmap_image':      StringProp(default='', fill_brok=['full_status']),
 
@@ -119,12 +120,12 @@ class Host(SchedulingItem):
         'poller_tag':           StringProp(default='None'),
         'reactionner_tag':           StringProp(default='None'),
         'resultmodulations':    StringProp(default=''),
-        'criticitymodulations': StringProp(default=''),
+        'business_impact_modulations': StringProp(default=''),
         'escalations':          StringProp(default='', fill_brok=['full_status']),
         'maintenance_period':   StringProp(default='', fill_brok=['full_status']),
 
-        # Criticity value
-        'criticity':            IntegerProp(default='2', fill_brok=['full_status']),
+        # Business impact value
+        'business_impact':            IntegerProp(default='2', fill_brok=['full_status']),
     })
 
     # properties set only for running purpose
@@ -136,9 +137,9 @@ class Host(SchedulingItem):
         'in_checking':          BoolProp(default=False, fill_brok=['full_status', 'check_result', 'next_schedule']),
         'latency':              FloatProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
         'attempt':              IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
-        'state':                StringProp(default='PENDING', fill_brok=['full_status'], retention=True),
+        'state':                StringProp(default='PENDING', fill_brok=['full_status', 'check_result'], retention=True),
         'state_id':             IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
-        'state_type':           StringProp(default='HARD', fill_brok=['full_status'], retention=True),
+        'state_type':           StringProp(default='HARD', fill_brok=['full_status', 'check_result'], retention=True),
         'state_type_id':        IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
         'current_event_id':     StringProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
         'last_event_id':        IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
@@ -241,8 +242,8 @@ class Host(SchedulingItem):
         'is_problem':           StringProp(default=False, fill_brok=['full_status']),
         'is_impact':            StringProp(default=False, fill_brok=['full_status']),
 
-        # the save value of our criticity for "problems"
-        'my_own_criticity':     IntegerProp(default=-1),
+        # the save value of our business_impact for "problems"
+        'my_own_business_impact':     IntegerProp(default=-1, fill_brok=['full_status']),
 
         # list of problems that make us an impact
         'source_problems':      StringProp(brok_transformation=to_svc_hst_distinct_lists, default=[], fill_brok=['full_status']),
@@ -323,10 +324,14 @@ class Host(SchedulingItem):
 
 
     # This tab is used to transform old parameters name into new ones
-    # so from Nagios2 format, to Nagios3 ones
+    # so from Nagios2 format, to Nagios3 ones.
+    # Or Shinken deprecated names like criticity
     old_properties = {
-        'normal_check_interval': 'check_interval',
-        'retry_check_interval':  'retry_interval'
+        'normal_check_interval' : 'check_interval',
+        'retry_check_interval'  : 'retry_interval',
+        'criticity'             : 'business_impact',
+#        'criticitymodulations'  : 'business_impact_modulations',
+        
     }
 
 
@@ -442,6 +447,13 @@ class Host(SchedulingItem):
     def get_dbg_name(self):
         return self.host_name
 
+    # Same but for clean call, no debug
+    def get_full_name(self):
+        return self.host_name
+
+    # Get our realm
+    def get_realm(self):
+        return self.realm
 
     # Say if we got the other in one of your dep list
     def is_linked_with_host(self, other):
@@ -583,12 +595,12 @@ class Host(SchedulingItem):
         else:
             self.last_state = self.state
 
-        if status == 0:
+        if status == 0 or (status == 1 and cls.use_aggressive_host_checking == 0):
             self.state = 'UP'
             self.state_id = 0
             self.last_time_up = int(self.last_state_update)
             state_code = 'u'
-        elif status in (1, 2, 3):
+        elif status in (2, 3) or (status == 1 and cls.use_aggressive_host_checking == 1):
             self.state = 'DOWN'
             self.state_id = 1
             self.last_time_down = int(self.last_state_update)
@@ -769,7 +781,7 @@ class Host(SchedulingItem):
 
     #See if the notification is launchable (time is OK and contact is OK too)
     def notification_is_blocked_by_contact(self, n, contact):
-        return not contact.want_host_notification(self.last_chk, self.state, n.type, self.criticity)
+        return not contact.want_host_notification(self.last_chk, self.state, n.type, self.business_impact)
 
 
     #MACRO PART
@@ -933,7 +945,7 @@ class Hosts(Items):
     # hosts -> hosts (parents, etc)
     # hosts -> commands (check_command)
     # hosts -> contacts
-    def linkify(self, timeperiods=None, commands=None, contacts=None, realms=None, resultmodulations=None, criticitymodulations=None, escalations=None, hostgroups=None):
+    def linkify(self, timeperiods=None, commands=None, contacts=None, realms=None, resultmodulations=None, businessimpactmodulations=None, escalations=None, hostgroups=None):
         self.linkify_with_timeperiods(timeperiods, 'notification_period')
         self.linkify_with_timeperiods(timeperiods, 'check_period')
         self.linkify_with_timeperiods(timeperiods, 'maintenance_period')
@@ -945,7 +957,7 @@ class Hosts(Items):
         self.linkify_with_contacts(contacts)
         self.linkify_h_by_realms(realms)
         self.linkify_with_resultmodulations(resultmodulations)
-        self.linkify_with_criticitymodulations(criticitymodulations)
+        self.linkify_with_business_impact_modulations(businessimpactmodulations)
         # WARNING: all escalations will not be link here
         # (just the escalation here, not serviceesca or hostesca).
         # This last one will be link in escalations linkify.
@@ -1016,15 +1028,6 @@ class Hosts(Items):
                             err = "Error : the hostgroup '%s' of the host '%s' is unknown" % (hg_name, h.host_name)
                             h.configuration_errors.append(err)
                 h.hostgroups = new_hostgroups
-
-
-
-    # It's used to change old Nagios2 names to
-    # Nagios3 ones
-    def old_properties_names_to_new(self):
-        for h in self:
-            h.old_properties_names_to_new()
-
 
 
     # We look for hostgroups property in hosts and
