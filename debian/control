@@ -104,5 +104,16 @@ Description: Flexible monitoring - Scheduler module
  for their monitoring system that can easily scale to large environments.
 # }}}
 
+# {{{ WebUI module
+Package: shinken-webui
+Architecture: all
+Depends: python (>= 2.5), shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: Flexible monitoring - WebUI module
+ WebUI module for shinken monitoring
+ Shinken is a new, Nagios compatible monitoring tool, written in Python. The
+ main goal of Shinken is to allow users to have a fully flexible architecture
+ for their monitoring system that can easily scale to large environments.
+# }}}
+
 # vim: foldmethod=marker:
 
