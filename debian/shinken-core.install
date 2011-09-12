@@ -20,7 +20,7 @@ debian/tmp/etc/default                                                          
 debian/config-files/etc/shinken/*.ini                                                          /etc/shinken/
 debian/config-files/etc/shinken/objects/*                                                      /etc/shinken/objects/
 # [a-v]*.cfg include everything except webui.cfg
-debian/config-files/etc/shinken/objects/[a-v]*.cfg                                             /etc/shinken/
+debian/config-files/etc/shinken/[a-v]*.cfg                                                     /etc/shinken/
 
 debian/tmp/etc/init.d/shinken                                                                  /etc/init.d
 
