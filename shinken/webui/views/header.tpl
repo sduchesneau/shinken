@@ -1,4 +1,4 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!DOCTYPE html>
 
 %#Set default values
 %if not 'js' in locals() : js = []
@@ -6,10 +6,13 @@
 %if not 'css' in locals() : css = []
 %if not 'print_menu' in locals() : print_menu = True
 %if not 'print_header' in locals() : print_header = True
+%if not 'refresh' in locals() : refresh = False
 
 %# If not need, disable the top right banner
 %if not 'top_right_banner_state' in locals() : top_right_banner_state = 0
 
+%# For the menu selection
+%if not 'menu_part' in locals() : menu_part = ''
 
 <html slick-uniqueid="1"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
@@ -34,6 +37,9 @@
     <script type="text/javascript" src="/static/js/action.js"></script>
     <script type="text/javascript" src="/static/js/opacity.js"></script>
     <script type="text/javascript" src="/static/js/multibox.js"></script>
+    %if refresh:
+    <script type="text/javascript" src="/static/js/reload.js"></script>
+    %end
     
 
 
@@ -71,15 +77,19 @@
 			<!-- Header END -->
 %end
 			<div class="clear"></div>
-%# Only show the menu if we want.
+%# " Only show the menu if we want. "
 %if print_menu:			
 			<div id="nav" class="grid_16">
 			  <ul>
-			    <li><a href="http://unitedseed.de/tmp/Meatball/host_detail.html#">Dashboard</a></li>
-			    <li><a href="http://unitedseed.de/tmp/Meatball/host_detail.html#">Hosts</a></li>
-			    <li><a href="http://unitedseed.de/tmp/Meatball/host_detail.html#" id="selected">Incidents</a></li>
-			    <li><a href="http://unitedseed.de/tmp/Meatball/host_detail.html#">Services</a></li>
-			    <li><a href="http://unitedseed.de/tmp/Meatball/host_detail.html#">System</a></li>
+			    %menu = [ ('/', 'Dashboard'), ('/impacts','Impacts'), ('/problems','IT problems'), ('/system', 'System') ]
+			    %for (key, value) in menu:
+			      %# Check for the selected element, if there is one
+			      %if menu_part == key:
+			        <li><a href="{{key}}" id="selected">{{value}}</a></li>
+			      %else:
+			        <li><a href="{{key}}">{{value}}</a></li>
+			      %end
+			    %end
 			  </ul>
 			</div>
 			<div class="clear"></div>
