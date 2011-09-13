@@ -2,12 +2,3 @@ debian/tmp/usr/lib/python2.6/dist-packages/shinken/webui                        
 
 
 debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/webui_broker                        /usr/lib/python2.6/dist-packages/shinken/modules/
-
-
-debian/tmp/usr/lib/python2.6/dist-packages/shinken/daemons/webuidaemon.py                      /usr/lib/python2.6/dist-packages/shinken/daemons/
-
-
-debian/tmp/usr/bin/shinken-webui                                                               /usr/bin
-
-
-debian/config-files/etc/shinken/webui.cfg                                                      /etc/shinken/
