@@ -34,13 +34,17 @@ import traceback
 import select
 import threading
 import base64
-
+import cPickle
 
 from shinken.basemodule import BaseModule
 from shinken.message import Message
 from shinken.webui.bottle import Bottle, run, static_file, view, route, request, response
 from shinken.misc.regenerator import Regenerator
 from shinken.log import logger
+from shinken.modulesmanager import ModulesManager
+from shinken.daemon import Daemon
+
+#Local import
 from datamanager import datamgr
 from helper import helper
 
@@ -60,7 +64,7 @@ bottle.TEMPLATE_PATH.append(bottle_dir)
 
 #Class for the Merlindb Broker
 #Get broks and puts them in merlin database
-class Webui_broker(BaseModule):
+class Webui_broker(BaseModule, Daemon):
     def __init__(self, modconf):
         BaseModule.__init__(self, modconf)
 
@@ -68,7 +72,11 @@ class Webui_broker(BaseModule):
 
         self.port = int(getattr(modconf, 'port', '8080'))
         self.host = getattr(modconf, 'host', '0.0.0.0')
+        self.sessions_file = getattr(modconf, 'sessions_file', 'sessions.ret')
         self.http_backend = getattr(modconf, 'http_backend', 'wsgiref')
+        # Load the photo dir and make it a absolute path
+        self.photo_dir = getattr(modconf, 'photo_dir', 'photos')
+        self.photo_dir = os.path.abspath(self.photo_dir)
         print "Webui : using the backend", self.http_backend
 
         self.rg = Regenerator()
@@ -77,15 +85,76 @@ class Webui_broker(BaseModule):
         self.helper = helper
         self.request = request
         self.response = response
-        self.sessions = {}
+
+        # Daemon like init
+        self.debug_output = []
+        self.modules_manager = ModulesManager('webui', self.find_modules_path(), [])
+        # We can now output some previouly silented debug ouput
+        for s in self.debug_output:
+            print s
+        del self.debug_output
+
+        self.log = logger
+        self.load_sessions()
+        self.check_photo_dir()
         
 
+    # Try to load sessions
+    def load_sessions(self):
+        # If the session file exist, try to load it
+        p = os.path.abspath(self.sessions_file)
+        if os.path.isfile(p):
+            print "Trying to read the session file", p
+            try:
+                f = open(p, 'rb')
+                self.sessions = cPickle.load(f)
+                f.close()
+                return
+            except Exception, exp:
+                print "Error in loading session file : %s" % exp
+        else:
+            print "No session file at", p
+        # Error : init sessions as void
+        self.sessions = {}        
+
+
+    # We got a new session, so we try to save our file
+    def save_sessions(self):
+        # If the session file exist, try to load it
+        p = os.path.abspath(self.sessions_file)
+        print "Trying to save the session file", p
+        try:
+            f = open(p, 'wb')
+            cPickle.dump(self.sessions, f)
+            f.close()
+            return
+        except Exception, exp:
+            print "Error in saving session file : %s" % exp
+
+
+    # We check if the photo directory exists. If not, try to create it
+    def check_photo_dir(self):
+        print "Checking photo path", self.photo_dir
+        if not os.path.exists(self.photo_dir):
+            print "Truing to create photo dir", self.photo_dir
+            try:
+                os.mkdir(self.photo_dir)
+            except Exception, exp:
+                print "Photo dir creation failed", exp
+                
+        
 
     # Called by Broker so we can do init stuff
     # TODO : add conf param to get pass with init
     # Conf from arbiter!
     def init(self):
         print "Init of the Webui '%s'" % self.name
+        self.modules_manager.set_modules(self.modules)
+        self.do_load_modules()
+        for inst in self.modules_manager.instances:
+            f = getattr(inst, 'load', None)
+            if f and callable(f):
+                f(self)
 
 
 
@@ -159,16 +228,25 @@ class Webui_broker(BaseModule):
         print "Data thread started"
         while True:
            b = self.to_q.get()
-           print "Got a brok"
+           #print "Got a brok"
            # For updating, we cannot do it while
            # answer queries, so lock it
            self.global_lock.acquire()
            try:
-              print "Got data lock, manage brok"
-              self.rg.manage_brok(b)
+               #print "Got data lock, manage brok"
+               self.rg.manage_brok(b)
+               for mod in self.modules_manager.get_internal_instances():
+                   try:
+                       mod.manage_brok(b)
+                   except Exception , exp:
+                       print exp.__dict__
+                       logger.log("[%s] Warning : The mod %s raise an exception: %s, I'm tagging it to restart later" % (self.name, mod.get_name(),str(exp)))
+                       logger.log("[%s] Exception type : %s" % (self.name, type(exp)))
+                       logger.log("Back trace of this kill: %s" % (traceback.format_exc()))
+                       self.modules_manager.set_to_restart(mod)
            finally:
-              print "Release data lock"
-              self.global_lock.release()
+               #print "Release data lock"
+               self.global_lock.release()
 
 
     # Here we will load all plugins (pages) under the webui/plugins
@@ -268,6 +346,14 @@ class Webui_broker(BaseModule):
 
 
     def declare_common_static(self):
+        @route('/static/photos/:path#.+#')
+        def give_photo(path):
+            # If the file really exist, give it. If not, give a dummy image.
+            if os.path.exists(os.path.join(self.photo_dir, path+'.jpg')):
+                return static_file(path+'.jpg', root=self.photo_dir)
+            else:
+                return static_file('images/user.png', root=os.path.join(bottle_dir, 'htdocs'))
+
         # Route static files css files
         @route('/static/:path#.+#')
         def server_static(path):
@@ -280,13 +366,20 @@ class Webui_broker(BaseModule):
 
 
 
+
+
     def check_auth(self, user, password):
         print "Checking auth of", user, password
         c = self.datamgr.get_contact(user)
         print "Got", c
         if c is not None:
             sid = base64.urlsafe_b64encode(os.urandom(30))
-            self.sessions[sid] = c.get_name()
+            self.sessions[sid] = {'contact_name' : c.get_name(), 'logon_time' : time.time()}
+            # Ok, we now save our sessions
+            self.save_sessions()
             return sid
         return None
 
+
+    def is_valid(self, sid):
+        return sid in self.sessions

@@ -5,6 +5,14 @@
 %include header js=['impacts/js/impacts.js', 'impacts/js/multi.js'], title='All critical impacts for your business', css=['impacts/impacts.css'], refresh=True, menu_part = '/impacts'
 
 
+%# " If the auth succeed, we go in the /problems page "
+%if not valid_user:
+<script type="text/javascript">
+  window.location.replace("/login");
+</script>
+%# " And if the javascript is not follow? not a problem, we gave no data here."
+%end
+
 
 
     <div class="whole-page">
@@ -39,8 +47,8 @@
 	  %end
 
 	    
-	  <div class="impact-icon"><img src="static/images/50x50.png"></div>
-	  <div class="impact-status-icon"><img style="width: 64px;height: 64px;" src="{{helper.get_icon_state(impact)}}"></div>
+%#	  <div class="impact-icon"><img src="static/images/50x50.png"></div>
+	  <div class="impact-icon"><img style="width: 64px;height: 64px;" src="{{helper.get_icon_state(impact)}}"></div>
 	  <div class="impact-rows">
 	    <div class="impact-row"><span class="impact-name">{{impact.get_name()}}</span> is <span class="impact-state-text">{{impact.state}}</span>
 
@@ -74,7 +82,7 @@
 	<div class="problems-panel" id="problems-{{imp_id}}" style="visibility: hidden; zoom: 1; opacity: 0; ">
 	  <div class="right-panel-top"> 
 
-	    <div class="pblink" id="{{imp_id}}"> Close </div>
+	    <div class="pblink" id="{{imp_id}}"> <img style="width: 16px;height: 16px;" src='/static/images/disabled.png'> Close </div>
 	  </div><br style="clear: both">
 
 	  <div class="impact-icon-big"><img style="width: 80px;height: 80px;" src="{{helper.get_icon_state(impact)}}">
@@ -85,11 +93,13 @@
 	    </div>
 	  %end
 
-
 	  <center>
 	    <div class="impact-row"><span class="impact-inpb-name">{{impact.get_full_name()}}</span> is <span class="impact-state-text">{{impact.state}}</span>
 	    </div>
 	  </center>
+
+	  <div style="float:right;"> <a href="{{!helper.get_link_dest(impact)}}">{{!helper.get_button('Go to details', img='/static/images/search.png')}}</a>
+	  </div>
 
 	  %##### OK, we print root problem NON ack first
 
