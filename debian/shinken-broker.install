@@ -1,19 +1,19 @@
-debian/tmp/usr/share/pyshared/shinken/daemons/brokerdaemon.py                     /usr/share/pyshare/dist-packages/shinken/daemons/
+debian/tmp/usr/share/pyshared/shinken/daemons/brokerdaemon.py                     /usr/share/pyshared/shinken/daemons/
 
-debian/tmp/usr/share/pyshared/shinken/modules/couchdb_broker                      /usr/share/pyshare/dist-packages/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/modules/host_perfdata_broker                /usr/share/pyshare/dist-packages/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/modules/livestatus_broker                   /usr/share/pyshare/dist-packages/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/modules/merlindb_broker                     /usr/share/pyshare/dist-packages/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/modules/ndodb_mysql_broker                  /usr/share/pyshare/dist-packages/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/modules/ndodb_oracle_broker                 /usr/share/pyshare/dist-packages/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/modules/npcdmod_broker.py                   /usr/share/pyshare/dist-packages/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/modules/simplelog_broker.py                 /usr/share/pyshare/dist-packages/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/modules/status_dat_broker                   /usr/share/pyshare/dist-packages/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/modules/syslog_broker.py                    /usr/share/pyshare/dist-packages/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/modules/service_perfdata_broker             /usr/share/pyshare/dist-packages/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/couchdb_broker                      /usr/share/pyshared/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/host_perfdata_broker                /usr/share/pyshared/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/livestatus_broker                   /usr/share/pyshared/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/merlindb_broker                     /usr/share/pyshared/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/ndodb_mysql_broker                  /usr/share/pyshared/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/ndodb_oracle_broker                 /usr/share/pyshared/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/npcdmod_broker.py                   /usr/share/pyshared/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/simplelog_broker.py                 /usr/share/pyshared/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/status_dat_broker                   /usr/share/pyshared/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/syslog_broker.py                    /usr/share/pyshared/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/service_perfdata_broker             /usr/share/pyshared/shinken/modules/
 
 
-debian/tmp/usr/bin/shinken-broker                                                              /usr/bin
+debian/tmp/usr/bin/shinken-broker                                                 /usr/bin
 
-debian/tmp/etc/init.d/shinken-broker                                                           /etc/init.d/
+debian/tmp/etc/init.d/shinken-broker                                              /etc/init.d/
 
