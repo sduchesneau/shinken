@@ -64,7 +64,8 @@ binary:
 	# creates empty var directory
 	mkdir -p --mode=750 debian/shinken-core/var/log/shinken
 	
-	dh_python2
+	dh_python2 \
+	  --no-guessing-deps
 	dh_installdocs
 	dh_installchangelogs
 	dh_installexamples
