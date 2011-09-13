@@ -9,7 +9,7 @@ export DH_OPTIONS
 
 
 %:
-	dh $@
+	dh $@ --with python2
 
 build:
 	dh_testdir
@@ -22,6 +22,7 @@ binary:
 	dh_prep
 	dh_installdirs
 	dh_auto_install
+	dh_python2
 	
 	# Fix debian paths
 	sed -i -r "s#$(CURDIR)/debian/tmp##" \
