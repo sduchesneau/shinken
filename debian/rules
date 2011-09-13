@@ -22,7 +22,6 @@ binary:
 	dh_prep
 	dh_installdirs
 	dh_auto_install
-	dh_python2
 	
 	# Fix debian paths
 	sed -i -r "s#$(CURDIR)/debian/tmp##" \
@@ -61,6 +60,7 @@ binary:
 	# creates empty var directory
 	mkdir -p --mode=750 debian/shinken-core/var/log/shinken
 	
+	dh_python2
 	dh_installdocs
 	dh_installchangelogs
 	dh_installexamples
