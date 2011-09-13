@@ -1,8 +1,8 @@
 
-debian/tmp/usr/lib/python2.6/dist-packages/shinken/webui                                       /usr/share/pyshared/dist-packages/shinken/
-debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/active_directory_ui.py              /usr/share/pyshared/dist-packages/shinken/
-debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/passwd_ui.py                        /usr/share/pyshared/dist-packages/shinken/
+debian/tmp/usr/share/pyshared/shinken/webui                                       /usr/share/pyshared/shinken/
+debian/tmp/usr/share/pyshared/shinken/modules/active_directory_ui.py              /usr/share/pyshared/shinken/
+debian/tmp/usr/share/pyshared/shinken/modules/passwd_ui.py                        /usr/share/pyshared/shinken/
 
-debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/webui_broker                        /usr/share/pyshared/dist-packages/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/webui_broker                        /usr/share/pyshared/shinken/modules/
 
 debian/config-files/etc/shinken/htpasswd.users                                                 /etc/shinken/

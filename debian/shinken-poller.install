@@ -1,7 +1,7 @@
-debian/tmp/usr/lib/python2.6/dist-packages/shinken/daemons/pollerdaemon.py                     /usr/share/pyshared/dist-packages/shinken/daemons/
+debian/tmp/usr/share/pyshared/shinken/daemons/pollerdaemon.py                     /usr/share/pyshared/shinken/daemons/
 
-debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/dummy_poller.py                     /usr/share/pyshared/dist-packages/shinken/modules/
-debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/nrpe_poller.py                      /usr/share/pyshared/dist-packages/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/dummy_poller.py                     /usr/share/pyshared/shinken/modules/
+debian/tmp/usr/share/pyshared/shinken/modules/nrpe_poller.py                      /usr/share/pyshared/shinken/modules/
 
 debian/tmp/usr/bin/shinken-poller                                                              /usr/bin
 

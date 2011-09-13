@@ -7,7 +7,6 @@
 # This has to be exported to make some magic below work.
 export DH_OPTIONS
 
-
 %:
 	dh $@ --with python2
 
@@ -21,7 +20,12 @@ binary:
 	dh_testroot
 	dh_prep
 	dh_installdirs
-	dh_auto_install
+	
+	python setup.py install \
+	  --no-compile \
+	  --install-purelib /usr/share/pyshared/ \
+	  --install-layout=deb \
+	  --root $(CURDIR)/debian/tmp
 	
 	# Fix debian paths
 	sed -i -r "s#$(CURDIR)/debian/tmp##" \
