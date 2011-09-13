@@ -23,7 +23,7 @@ binary:
 	
 	python setup.py install \
 	  --no-compile \
-	  --install-purelib /usr/share/pyshared/ \
+	  --install-purelib /usr/lib/python2.6/dist-packages/ \
 	  --install-layout=deb \
 	  --root $(CURDIR)/debian/tmp
 	
@@ -64,7 +64,15 @@ binary:
 	# creates empty var directory
 	mkdir -p --mode=750 debian/shinken-core/var/log/shinken
 	
-	dh_python2 
+	dh_python2 -p shinken-core
+	dh_python2 -p shinken-arbiter
+	dh_python2 -p shinken-broker
+	dh_python2 -p shinken-reactionner
+	dh_python2 -p shinken-poller
+	dh_python2 -p shinken-webui
+	dh_python2 -p shinken-discovery
+	dh_python2 -p shinken-receiver
+	dh_python2 -p shinken-scheduler
 	dh_installdocs
 	dh_installchangelogs
 	dh_installexamples

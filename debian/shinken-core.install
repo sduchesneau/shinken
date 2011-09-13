@@ -1,18 +1,18 @@
-debian/tmp/usr/share/pyshared/shinken/*.py                                        /usr/share/pyshared/shinken/
+debian/tmp/usr/lib/python2.6/dist-packages/shinken/*.py                                        /usr/lib/python2.6/dist-packages/shinken/
 
-debian/tmp/usr/share/pyshared/shinken/objects/*.py                                /usr/share/pyshared/shinken/objects/
+debian/tmp/usr/lib/python2.6/dist-packages/shinken/objects/*.py                                /usr/lib/python2.6/dist-packages/shinken/objects/
 
-debian/tmp/usr/share/pyshared/shinken/daemons/__init__.py                         /usr/share/pyshared/shinken/daemons/
+debian/tmp/usr/lib/python2.6/dist-packages/shinken/daemons/__init__.py                         /usr/lib/python2.6/dist-packages/shinken/daemons/
 
-debian/tmp/usr/share/pyshared/shinken/modules/__init__.py                         /usr/share/pyshared/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/modules/named_pipe.py                       /usr/share/pyshared/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/modules/nsca.py                             /usr/share/pyshared/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/modules/pickle_retention_file_generic.py    /usr/share/pyshared/shinken/modules/
-debian/tmp/usr/share/pyshared/shinken/misc                                        /usr/share/pyshared/shinken
+debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/__init__.py                         /usr/lib/python2.6/dist-packages/shinken/modules/
+debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/named_pipe.py                       /usr/lib/python2.6/dist-packages/shinken/modules/
+debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/nsca.py                             /usr/lib/python2.6/dist-packages/shinken/modules/
+debian/tmp/usr/lib/python2.6/dist-packages/shinken/modules/pickle_retention_file_generic.py    /usr/lib/python2.6/dist-packages/shinken/modules/
+debian/tmp/usr/lib/python2.6/dist-packages/shinken/misc                                        /usr/lib/python2.6/dist-packages/shinken
 
 
 
-debian/tmp/usr/share/pyshared/Shinken-0.6.egg-info                                /usr/share/pyshared/
+debian/tmp/usr/lib/python2.6/dist-packages/Shinken-0.6.egg-info                                /usr/lib/python2.6/dist-packages/
 
 debian/tmp/usr/lib/shinken                                                                     /usr/lib/
 
