@@ -14,8 +14,8 @@ build:
 	dh_testdir
 	dh_auto_configure
 	python setup.py build \
-	  --build-base debian/tmp/
-	  --build-purelib /usr/lib/python2.6/dist-packages/ 
+	  --build-base debian/tmp/ \
+	  --build-purelib debian/tmp/usr/lib/python2.6/dist-packages/ 
 	dh_auto_test
 
 binary: 
