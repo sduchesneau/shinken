@@ -5,8 +5,8 @@ Maintainer: Arthur Gautier <superbaloo+debian@superbaloo.net>
 Build-Depends: debhelper (>= 7.0.50~), python (>= 2.5), python-setuptools
 Standards-Version: 3.9.2
 Homepage: http://www.shinken-monitoring.org/
-#Vcs-Git: git://git.debian.org/collab-maint/shinken.git
-#Vcs-Browser: http://git.debian.org/?p=collab-maint/shinken.git;a=summary
+Vcs-Git: git://anonscm.debian.org/collab-maint/shinken.git
+Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/shinken.git;a=summary
 
 Package: shinken
 Architecture: all
