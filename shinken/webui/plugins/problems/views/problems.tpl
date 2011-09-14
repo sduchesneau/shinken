@@ -7,7 +7,7 @@
 %top_right_banner_state = datamgr.get_overall_state()
 
 
-%include header title='All problems', top_right_banner_state=top_right_banner_state, js=['problems/js/accordion.js'], css=['problems/accordion.css'], refresh=True, menu_part='/problems'
+%include header title='All problems', top_right_banner_state=top_right_banner_state, js=['problems/js/accordion.js'], css=['problems/accordion.css'], refresh=True, menu_part='/problems', user=user
 
 
 %# " If the auth got problem, we bail out"
@@ -22,12 +22,12 @@
 	 
 <div id="left_container" class="grid_2">
   <div id="dummy_box" class="box_gradient_horizontal"> 
-    <p>Dummy box</p>
+
   </div>
   <div id="nav_left">
     <ul>
-      <li><a href="http://unitedseed.de/tmp/Meatball/host_detail.html#">Overview</a></li>
-      <li><a href="http://unitedseed.de/tmp/Meatball/host_detail.html#">Detail</a></li>
+      <li><a href="/problems">All problems</a></li>
+
     </ul>
   </div>
 </div>

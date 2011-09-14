@@ -29,7 +29,7 @@ Invalid element name
 %top_right_banner_state = datamgr.get_overall_state()
 
 
-%include header title=elt_type.capitalize() + ' detail about ' + elt.get_full_name(),  js=['eltdetail/js/domtab.js','eltdetail/js/dollar.js', 'eltdetail/js/gesture.js', 'eltdetail/js/hide.js', 'eltdetail/js/switchbuttons.js', 'eltdetail/js/multi.js'],  css=['eltdetail/tabs.css', 'eltdetail/eltdetail.css', 'eltdetail/switchbuttons.css', 'eltdetail/hide.css', 'eltdetail/gesture.css'], top_right_banner_state=top_right_banner_state 
+%include header title=elt_type.capitalize() + ' detail about ' + elt.get_full_name(),  js=['eltdetail/js/domtab.js','eltdetail/js/dollar.js', 'eltdetail/js/gesture.js', 'eltdetail/js/hide.js', 'eltdetail/js/switchbuttons.js', 'eltdetail/js/multi.js'],  css=['eltdetail/tabs.css', 'eltdetail/eltdetail.css', 'eltdetail/switchbuttons.css', 'eltdetail/hide.css', 'eltdetail/gesture.css'], top_right_banner_state=top_right_banner_state , user=user
 
 
 %#  "This is the background canvas for all gesture detection things " 
@@ -40,12 +40,10 @@ Invalid element name
 
 <div id="left_container" class="grid_2">
   <div id="dummy_box" class="box_gradient_horizontal"> 
-    <p>Dummy box</p>
   </div>
   <div id="nav_left">
     <ul>
-      <li><a href="http://unitedseed.de/tmp/Meatball/host_detail.html#">Overview</a></li>
-      <li><a href="http://unitedseed.de/tmp/Meatball/host_detail.html#">Detail</a></li>
+      <li><a href="#">Overview</a></li>
     </ul>
     <div class="opacity_hover"> Gestures : 
       <br>
