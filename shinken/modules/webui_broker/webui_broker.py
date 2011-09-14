@@ -380,6 +380,7 @@ class Webui_broker(BaseModule, Daemon):
         for mod in self.modules_manager.get_internal_instances():
             try:
                 f = getattr(mod, 'check_auth', None)
+                print "Get check_auth", f, "from", mod.get_name()
                 if f and callable(f):
                     r = f(user, password)
                     if r:
@@ -404,3 +405,13 @@ class Webui_broker(BaseModule, Daemon):
 
     def is_valid(self, sid):
         return sid in self.sessions
+
+
+    def get_user(self, sid):
+        e = self.sessions.get(sid, None)
+        if e is None:
+            return None
+        cname = e['contact_name']
+        c = self.datamgr.get_contact(cname)
+        return c
+        
