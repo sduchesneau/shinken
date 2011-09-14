@@ -14,10 +14,8 @@ build:
 	dh_testdir
 	dh_auto_configure
 	python setup.py build \
-	  --no-compile \
-	  --install-purelib /usr/lib/purelibpython2.6/dist-packages/ \
-	  --install-layout=deb \
-	  --root $(CURDIR)/debian/tmp
+	  --build-base debian/tmp/
+	  --build-purelib /usr/lib/python2.6/dist-packages/ 
 	dh_auto_test
 
 binary: 
@@ -27,8 +25,8 @@ binary:
 	
 	python setup.py install \
 	  --no-compile \
-	  --install-purelib /usr/lib/python2.6/dist-packages/ \
 	  --install-layout=deb \
+	  --install-purelib /usr/lib/python2.6/dist-packages/ \
 	  --root $(CURDIR)/debian/tmp
 	
 	# Fix debian paths
