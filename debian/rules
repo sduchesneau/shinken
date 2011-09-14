@@ -54,11 +54,16 @@ binary:
 	     debian/tmp/etc/init.d/shinken-reactionner \
 	     debian/tmp/etc/init.d/shinken-scheduler
 	
-	
 	dh_install
 	
 	# creates empty var directory
 	mkdir -p --mode=750 debian/shinken-core/var/log/shinken
+	
+	# Avoid mootools duplication
+	rm debian/shinken-webui/usr/lib/python2.6/dist-packages/shinken/webui/htdocs/js/mootools.js
+	rm debian/shinken-webui/usr/lib/python2.6/dist-packages/shinken/webui/htdocs/js/mootools-more.js
+	ln -s ../../../../../../../share/javascript/mootools/mootools.js debian/shinken-webui/usr/lib/python2.6/dist-packages/shinken/webui/htdocs/js/mootools.js
+	ln -s ../../../../../../../share/javascript/mootools/mootools-more.js debian/shinken-webui/usr/lib/python2.6/dist-packages/shinken/webui/htdocs/js/mootools-more.js
 	
 	dh_installdocs
 	dh_installchangelogs
