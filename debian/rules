@@ -60,6 +60,7 @@ binary:
 	     debian/tmp/etc/init.d/shinken-reactionner \
 	     debian/tmp/etc/init.d/shinken-scheduler
 	
+	# Split in subpackages
 	dh_install
 	
 	# creates empty var directory
