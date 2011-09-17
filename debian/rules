@@ -14,6 +14,8 @@ clean:
 	dh clean --with python2,quilt
 	# dh_clean does not support removing dirs
 	rm -rf build Shinken.egg-info
+	# Remove manpage build
+	make -C doc/manpages/markdown/ clean
 
 build:
 	dh_testdir
@@ -22,6 +24,8 @@ build:
 	  --build-base debian/tmp/ \
 	  --build-purelib debian/tmp/usr/lib/python2.6/dist-packages/ 
 	dh_auto_test
+	# Build manpages
+	make -C doc/manpages/markdown/
 
 binary: 
 	dh_testroot
