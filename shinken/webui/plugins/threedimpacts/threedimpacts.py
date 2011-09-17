@@ -1,4 +1,3 @@
-
 ### Will be populated by the UI with it's own value
 app = None
 
@@ -22,8 +21,9 @@ def hst_srv_sort(s1, s2):
 def show_3dimpacts():
     # First we look for the user sid
     # so we bail out if it's a false one
-    sid = app.request.get_cookie("sid")
-    if not app.is_valid(sid):
+    user = app.get_user_auth()
+
+    if not user:
         return {'app' : app, 'impacts' : [], 'valid_user' : False}
 
     all_imp_impacts = app.datamgr.get_important_elements()

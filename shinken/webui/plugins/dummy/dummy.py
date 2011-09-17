@@ -8,7 +8,10 @@ def get_page(arg1='nothing'):
 
 
 def get_data(arg1):
-    return {'host_name' : arg1}
+    user = app.get_user_auth()
+
+
+    return {'host_name' : arg1, 'valid_user' : True, 'user' : user}
 
 
 

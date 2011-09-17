@@ -1,11 +1,14 @@
 
 
+%# " We should limit the number of impactto show here. Too much is jsut useless "
+%max_impacts = 200
+
 %print 'Elt value?', elt
 %import time
 
 %# If got no Elt, bailout
 %if not elt:
-%include header title='Invalid name'
+%rebase layou title='Invalid name'
 
 Invalid element name
 
@@ -29,7 +32,7 @@ Invalid element name
 %top_right_banner_state = datamgr.get_overall_state()
 
 
-%include header title=elt_type.capitalize() + ' detail about ' + elt.get_full_name(),  js=['eltdetail/js/domtab.js','eltdetail/js/dollar.js', 'eltdetail/js/gesture.js', 'eltdetail/js/hide.js', 'eltdetail/js/switchbuttons.js', 'eltdetail/js/multi.js'],  css=['eltdetail/tabs.css', 'eltdetail/eltdetail.css', 'eltdetail/switchbuttons.css', 'eltdetail/hide.css', 'eltdetail/gesture.css'], top_right_banner_state=top_right_banner_state , user=user
+%rebase layout title=elt_type.capitalize() + ' detail about ' + elt.get_full_name(),  js=['eltdetail/js/domtab.js','eltdetail/js/dollar.js', 'eltdetail/js/gesture.js', 'eltdetail/js/hide.js', 'eltdetail/js/switchbuttons.js', 'eltdetail/js/multi.js'],  css=['eltdetail/css/tabs.css', 'eltdetail/css/eltdetail.css', 'eltdetail/css/switchbuttons.css', 'eltdetail/css/hide.css', 'eltdetail/css/gesture.css'], top_right_banner_state=top_right_banner_state , user=user
 
 
 %#  "This is the background canvas for all gesture detection things " 
@@ -227,6 +230,11 @@ Invalid element name
 	  %nb = 0
 	  %for s in helper.get_host_services_sorted(elt):
 	  %nb += 1
+
+	  %# " We put a max imapct to print, bacuse too high is just useless"
+	  %if nb > max_impacts:
+	  %   break 
+
 	  %if nb == 8:
 	  <div style="float:right;" id="hidden_impacts_or_services_button"><a href="javascript:show_hidden_impacts_or_services()"> {{!helper.get_button('Show all services', img='/static/images/expand.png')}}</a></div>
 	  %end

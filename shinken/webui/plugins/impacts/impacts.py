@@ -25,11 +25,9 @@ def hst_srv_sort(s1, s2):
 def show_impacts():
     # First we look for the user sid
     # so we bail out if it's a false one
-    sid = app.request.get_cookie("sid")
-    user = app.get_user(sid)
-    print "Impact give user", user
+    user = app.get_user_auth()
 
-    if not app.is_valid(sid):
+    if not user:
         return {'app' : app, 'impacts' : {}, 'valid_user' : False, 'user' : user}
 
     
