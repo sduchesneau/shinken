@@ -129,3 +129,4 @@ binary:
 
 get-orig-source:
 	uscan --force-download --rename
+	sh debian/x-exclude.sh
