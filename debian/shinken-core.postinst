@@ -52,9 +52,6 @@ case "$1" in
     dpkg-statoverride --remove /var/lib/shinken/ >/dev/null 2>&1 || true
     dpkg-statoverride --update --add shinken shinken 02750 /var/lib/shinken/ >/dev/null 2>&1 || true
 
-    ## Ensure shinken starts automatically
-    update-rc.d shinken defaults >/dev/null
-
     ;;
   abort-upgrade)
     # Back out of an attempt to upgrade this package FROM THIS VERSION
