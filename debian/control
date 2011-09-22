@@ -111,7 +111,7 @@ Description: Flexible monitoring - Receiver module
  for their monitoring system that can easily scale to large environments.
 #  }}}
 
-# {{{ Scheduler module
+#  {{{ Scheduler module
 Package: shinken-scheduler
 Architecture: all
 Depends: python (>= 2.6.6-3~), python-redis, python-memcache, shinken-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}
