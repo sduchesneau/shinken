@@ -44,6 +44,10 @@ case "$1" in
     ## Ensure /var/run/nagios is ready
     mkdir -p /var/run/nagios
 
+    ## Ensure log dir is okay
+    chown -R nagios:nagios /var/log/shinken
+
+
     ## No need anymore temporary vars
     rm -rf $TMP
     unset TMP
