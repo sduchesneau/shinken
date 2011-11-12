@@ -1,3 +1,13 @@
+shinken (0.8.1-1) unstable; urgency=low
+
+  * 0.8 version of shinken
+  * Major feature:
+    * WebUI
+  * For other things please see
+    https://github.com/naparuba/shinken/blob/master/Changelog
+
+ -- Arthur Gautier <superbaloo+debian@superbaloo.net>  Sat, 12 Nov 2011 15:10:17 +0100
+
 shinken (0.6.5-1) unstable; urgency=low
 
   * Initial release (Closes: #599073) 
