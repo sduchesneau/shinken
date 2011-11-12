@@ -21,10 +21,6 @@ case "$1" in
     TMP=$(mktemp -d)
     chown root:root $TMP
 
-    ## Adds shinken group
-    chgrp shinken $TMP 2>/dev/null ||
-      addgroup --system shinken
-
     ## Adds nagios group
     chgrp nagios $TMP 2>/dev/null ||
       addgroup --system nagios
@@ -55,11 +51,11 @@ case "$1" in
 
     ## Checks rights
     dpkg-statoverride --remove /var/run/shinken/ >/dev/null 2>&1 || true
-    dpkg-statoverride --update --add shinken shinken 02750 /var/run/shinken/ >/dev/null 2>&1 || true
+    dpkg-statoverride --update --add shinken nagios 02750 /var/run/shinken/ >/dev/null 2>&1 || true
     dpkg-statoverride --remove /var/log/shinken/ >/dev/null 2>&1 || true
-    dpkg-statoverride --update --add shinken shinken 02750 /var/log/shinken/ >/dev/null 2>&1 || true
+    dpkg-statoverride --update --add shinken nagios 02750 /var/log/shinken/ >/dev/null 2>&1 || true
     dpkg-statoverride --remove /var/lib/shinken/ >/dev/null 2>&1 || true
-    dpkg-statoverride --update --add shinken shinken 02750 /var/lib/shinken/ >/dev/null 2>&1 || true
+    dpkg-statoverride --update --add shinken nagios 02750 /var/lib/shinken/ >/dev/null 2>&1 || true
 
     ;;
   abort-upgrade)
