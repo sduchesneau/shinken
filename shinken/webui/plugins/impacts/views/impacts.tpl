@@ -15,6 +15,8 @@
 
 
 
+
+
     <div class="whole-page">
       
       
@@ -24,6 +26,10 @@
 
 %# " We look for separate bad and good elements, so we remember last state"
 %last_was_bad = False
+%# " By default we won't expand an impact."
+<script type="text/javascript">
+  var  impact_to_expand = -1;
+</script>
 %for imp_id in impacts:
 %   impact = impacts[imp_id]
 
@@ -36,7 +42,13 @@
     %last_was_bad = True
   %end
 
-	<div class="impact pblink" id="{{imp_id}}">
+  %if imp_id == 1 and impact.state_id != 0:
+    <script type="text/javascript">
+      impact_to_expand = {{imp_id}};
+    </script>
+  %end
+    <div class="impact pblink" id="{{imp_id}}">
+
 	  <div class="show-problem" id="show-problem-{{imp_id}}">
 	    <img src="static/images/trig_right.png" id="show-problem-img-{{imp_id}}">
 	  </div>
@@ -78,8 +90,8 @@
 %for imp_id in impacts:
 %   impact = impacts[imp_id]
 
+      <div class="problems-panel" id="problems-{{imp_id}}" style="visibility: hidden; zoom: 1; opacity: 0; ">
 
-	<div class="problems-panel" id="problems-{{imp_id}}" style="visibility: hidden; zoom: 1; opacity: 0; ">
 	  <div class="right-panel-top"> 
 
 	    <div class="pblink" id="{{imp_id}}"> <img style="width: 16px;height: 16px;" src='/static/images/disabled.png'> Close </div>
@@ -99,6 +111,7 @@
 	  </center>
 
 	  <div style="float:right;"> <a href="{{!helper.get_link_dest(impact)}}">{{!helper.get_button('Go to details', img='/static/images/search.png')}}</a>
+	    <a href="/depgraph/{{impact.get_full_name()}}" class="mb" title="Impact map of {{impact.get_full_name()}}">{{!helper.get_button('Show impact map', img='/static/images/state_ok.png')}}</a>
 	  </div>
 
 	  %##### OK, we print root problem NON ack first
@@ -110,7 +123,7 @@
 	  %nb_unack_pbs = len(unack_pbs)
 	  %nb_ack_pbs = len(ack_pbs)
 	  %if nb_unack_pbs > 0:
-	  Root problems unacknoledged :
+	  Root problems unacknowledged :
 	  %end
 
 	  %guessed = []
@@ -123,7 +136,7 @@
 	  % l_pb_id += 1
 	  
 	  %if nb_ack_pbs != 0 and l_pb_id == nb_unack_pbs + 1:
-	  Acknoledged problems:
+	  Acknowledged problems:
 	  %end
 
 	  %if len(guessed) != 0 and l_pb_id == nb_unack_pbs + nb_ack_pbs + 1:
@@ -135,11 +148,18 @@
 	    <div class="problem-actions opacity_hover">
 	      <div class="action-fixit"><a href="#" onclick="try_to_fix('{{pb.get_full_name()}}')"> <img class="icon" title="Try to fix it" src="static/images/icon_ack.gif">Try to fix it</a></div>
 	      %if not pb.problem_has_been_acknowledged:
-	      <div class="action-ack"><a href="#" onclick="acknoledge('{{pb.get_full_name()}}')"><img class="icon" title="Acknoledge it" src="static/images/link_processes.gif">Acknoledge it</a></div>
+	      <div class="action-ack"><a href="#" onclick="acknoledge('{{pb.get_full_name()}}')"><img class="icon" title="Acknowledge it" src="static/images/link_processes.gif">Acknowledge it</a></div>
 	      %end
 	    </div>
 	  </div>
 	  %# end for pb in impact.source_problems:
+	  %end
+
+	  %if len(impact.parent_dependencies) > 0:
+	  <a id="togglelink-{{impact.get_dbg_name()}}" href="javascript:toggleBusinessElt('{{impact.get_dbg_name()}}')"> {{!helper.get_button('Show dependency tree', img='/static/images/expand.png')}}</a>
+	  <div class="clear"></div>
+	  {{!helper.print_business_rules(datamgr.get_business_parents(impact))}}
+	  
 	  %end
 
 	  

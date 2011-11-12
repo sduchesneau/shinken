@@ -53,6 +53,9 @@ class IForArbiter(Interface):
         super(IForArbiter, self).put_conf(conf)
         self.app.must_run = False
 
+    def get_config(self):
+        return self.app.conf
+
     # The master arbiter asks me not to run!
     def do_not_run(self):
         # If i'm the master, then F**K YOU!
@@ -252,11 +255,11 @@ class Arbiter(Daemon):
                 arb.need_conf = True
 
         if not self.me:
-            sys.exit("Error: I cannot find my own Arbiter object, I bail out. "
-                     "To solve it, please change the host_name parameter in "
-                     "the object Arbiter in the file shinken-specific.cfg. "
-                     "With the value %s " % socket.gethostname(),
-                     "Thanks.")
+            sys.exit("Error: I cannot find my own Arbiter object, I bail out. \
+                     To solve it, please change the host_name parameter in \
+                     the object Arbiter in the file shinken-specific.cfg. \
+                     With the value %s \
+                     Thanks." % socket.gethostname())
 
         logger.log("My own modules : " + ','.join([m.get_name() for m in self.me.modules]))
 
@@ -354,7 +357,7 @@ class Arbiter(Daemon):
         # set ourown timezone and propagate it to other satellites
         self.conf.propagate_timezone_option()
 
-        # Look for business rules, and create teh dep trees
+        # Look for business rules, and create the dep tree
         self.conf.create_business_rules()
         # And link them
         self.conf.create_business_rules_dependencies()
@@ -506,9 +509,17 @@ class Arbiter(Daemon):
 
     # We wait (block) for arbiter to send us something
     def wait_for_master_death(self):
-        print "Waiting for master death"
+        logger.log("Waiting for master death")
         timeout = 1.0
         self.last_master_speack = time.time()
+
+        # Look for the master timeout
+        master_timeout = 300
+        for arb in self.conf.arbiterlinks:
+            if not arb.spare:
+                master_timeout = arb.check_interval * arb.max_check_attempts
+        logger.log("I'll wait master for %d seconds" % master_timeout)
+
         
         while not self.interrupted:
             elapsed, _, tcdiff = self.handleRequests(timeout)
@@ -529,8 +540,8 @@ class Arbiter(Daemon):
 
             # Now check if master is dead or not
             now = time.time()
-            if now - self.last_master_speack > 5:
-                print "Master is dead!!!"
+            if now - self.last_master_speack > master_timeout:
+                logger.log("Master is dead!!!")
                 self.must_run = True
                 break
 

@@ -182,7 +182,7 @@ class Service(SchedulingItem):
         'last_problem_id':    IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
         'current_problem_id': IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
         'execution_time':     FloatProp(default=0.0, fill_brok=['full_status', 'check_result'], retention=True),
-        'last_notification':  FloatProp(default=time.time(), fill_brok=['full_status'], retention=True),
+        'last_notification':  FloatProp(default=0.0, fill_brok=['full_status'], retention=True),
         'current_notification_number': IntegerProp(default=0, fill_brok=['full_status'],retention=True),
         'current_notification_id': IntegerProp(default=0, fill_brok=['full_status'], retention=True),
         'check_flapping_recovery_notification': BoolProp(default=True, fill_brok=['full_status'], retention=True),
@@ -242,6 +242,9 @@ class Service(SchedulingItem):
         'in_hard_unknown_reach_phase': BoolProp(default=False, retention=True),
         'was_in_hard_unknown_reach_phase': BoolProp(default=False, retention=True),
         'state_before_hard_unknown_reach_phase': StringProp(default='OK', retention=True),
+
+        # Set if the element just change its father/son topology
+        'topology_change' : BoolProp(default=False, fill_brok=['full_status']),
         
     })
 
@@ -406,7 +409,7 @@ class Service(SchedulingItem):
     # Must be AFTER linkify
     def fill_daddy_dependancy(self):
         #  Depend of host, all status, is a networkdep
-        # and do not have timeperiod, and folow parents dep
+        # and do not have timeperiod, and follow parents dep
         if self.host is not None:
             # I add the dep in MY list
             self.act_depend_of.append( (self.host,
@@ -568,7 +571,7 @@ class Service(SchedulingItem):
         # we should put in last_state the good last state:
         # if not just change the state by an problem/impact
         # we can take current state. But if it's the case, the
-        # real old state is self.state_before_impact (it's teh TRUE
+        # real old state is self.state_before_impact (it's the TRUE
         # state in fact)
         # but only if the global conf have enable the impact state change
         cls = self.__class__

@@ -339,7 +339,7 @@ class SchedulingItem(Item):
         self.source_problems.remove(pb)
 
         # For know if we are still an impact, maybe our dependancies
-        # are not aware of teh remove of the impact state because it's not ordered
+        # are not aware of the remove of the impact state because it's not ordered
         # so we can just look at if we still have some problem in our list
         if len(self.source_problems) == 0:
             self.is_impact = False
@@ -400,7 +400,8 @@ class SchedulingItem(Item):
                 parent_is_down.append(p_is_down)
 
         # if a parent is not down, no dep can explain the pb
-        if False in parent_is_down:
+        # or if we do'nt have any parents
+        if len(parent_is_down) == 0 or False in parent_is_down:
             return
         else:# every parents are dead, so... It's not my fault :)
             self.set_unreachable()
@@ -599,7 +600,8 @@ class SchedulingItem(Item):
             return
         
         # If we do not force and we are in downtime, bailout
-        if not externalcmd and self.in_scheduled_downtime:
+        # if the no_event_handlers_during_downtimes is 1 in conf
+        if cls.no_event_handlers_during_downtimes and not externalcmd and self.in_scheduled_downtime:
             return
 
         m = MacroResolver()
@@ -642,7 +644,7 @@ class SchedulingItem(Item):
             self.in_hard_unknown_reach_phase = False
 
         # So if we are not in already in such a phase, we check for
-        # a start or not. So here we are sure to be in a HARD/HARD folowing
+        # a start or not. So here we are sure to be in a HARD/HARD following
         # state
         if not self.in_hard_unknown_reach_phase:
             if self.state == 'UNKNOWN' and self.last_state != 'UNKNOWN' \
@@ -682,12 +684,15 @@ class SchedulingItem(Item):
 
         # Same for current output
         # TODO : remove in future version, this is need only for
-        # migration from old shinken version, that got outpout as str
+        # migration from old shinken version, that got output as str
         # and not unicode
         # if str, go in unicode
         if isinstance(self.output, str):
             self.output = self.output.decode('utf8', 'ignore')
             self.long_output = self.long_output.decode('utf8', 'ignore')
+
+        if isinstance(c.perf_data, str):
+            c.perf_data = c.perf_data.decode('utf8', 'ignore')
 
         # We check for stalking if necessery
         # so if check is here

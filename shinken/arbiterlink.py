@@ -43,6 +43,10 @@ class ArbiterLink(SatelliteLink):
         return self.arbiter_name
 
 
+    def get_config(self):
+        return self.con.get_config()
+
+
     #Check is required prop are set:
     #contacts OR contactgroups is need
     def is_correct(self):
@@ -57,7 +61,7 @@ class ArbiterLink(SatelliteLink):
 
 
     def is_me(self):
-        logger.log("And arbiter is launched with the hostname:%s of addr :%s" % (self.host_name, socket.gethostname()), print_it=False)
+        logger.log("And arbiter is launched with the hostname:%s from an arbiter point of view of addr :%s" % (self.host_name, socket.gethostname()), print_it=False)
         return self.host_name == socket.gethostname()
 
 

@@ -33,7 +33,8 @@ from shinken.schedulerlink import SchedulerLink, SchedulerLinks
 from shinken.reactionnerlink import ReactionnerLink, ReactionnerLinks
 from shinken.pollerlink import PollerLink, PollerLinks
 from shinken.brokerlink import BrokerLink, BrokerLinks
-
+from shinken.receiverlink import ReceiverLink, ReceiverLinks
+from shinken.util import safe_print
 
 
 
@@ -57,6 +58,7 @@ class Regenerator:
         self.pollers = PollerLinks([])
         self.reactionners = ReactionnerLinks([])
         self.brokers = BrokerLinks([])
+        self.receivers = ReceiverLinks([])
 
         # And in progress one
         self.inp_hosts = {}
@@ -115,11 +117,11 @@ class Regenerator:
         #print hp.heap()
 
         start = time.time()
-        print "In ALL Done linking phase for instance", inst_id
+        safe_print("In ALL Done linking phase for instance", inst_id)
         # check if the instance is really defined, so got ALL the
         # init phase
         if not inst_id in self.configs.keys():
-            print "Warning : the instance %d is not fully given, bailout" % inst_id
+            safe_print("Warning : the instance %d is not fully given, bailout" % inst_id)
             return
 
         # Try to load the in progress list and make them available for 
@@ -290,7 +292,7 @@ class Regenerator:
         # We can delare contactgroups done
         self.contactgroups.create_reversed_list()
 
-        print "ALL LINKING TIME"*10, time.time() - start
+        safe_print("ALL LINKING TIME"*10, time.time() - start)
 
         # clean old objects
         del self.inp_hosts[inst_id]
@@ -421,7 +423,7 @@ class Regenerator:
     def manage_program_status_brok(self, b):
         data = b.data
         c_id = data['instance_id']
-        print "Regenerator : Creating config:", c_id
+        safe_print("Regenerator : Creating config:", c_id)
         
         # We get a real Conf object ,adn put our data
         c = Config()
@@ -441,25 +443,25 @@ class Regenerator:
         ##Clean the old "hard" objects
 
         # We should clean all previously added hosts and services
-        print "Clean hosts/service of", c_id
+        safe_print("Clean hosts/service of", c_id)
         to_del_h = [h for h in self.hosts if h.instance_id == c_id]
         to_del_srv = [s for s in self.services if s.instance_id == c_id]
 
-        print "Cleaning host:%d srv:%d" % (len(to_del_h), len(to_del_srv))
+        safe_print("Cleaning host:%d srv:%d" % (len(to_del_h), len(to_del_srv)))
         # Clean hosts from hosts and hostgroups
         for h in to_del_h:
-            print "Deleting", h.get_name()
+            safe_print("Deleting", h.get_name())
             del self.hosts[h.id]
 
         # Now clean all hostgroups too
         for hg in self.hostgroups:
-            print "Cleaning hostgroup %s:%d" % (hg.get_name(), len(hg.members))
+            safe_print("Cleaning hostgroup %s:%d" % (hg.get_name(), len(hg.members)))
             # Exclude from members the hosts with this inst_id
             hg.members = [h for h in hg.members if h.instance_id != c_id]
-            print "Len after", len(hg.members)
+            safe_print("Len after", len(hg.members))
 
         for s in to_del_srv:
-            print "Deleting", s.gt_dbg_name()
+            safe_print("Deleting", s.get_full_name())
             del self.services[s.id]
 
         # Now clean service groups
@@ -484,7 +486,7 @@ class Regenerator:
             print "Not good!", exp
             return
 
-        print "Creating an host: %s in instance %d" % (hname, inst_id)
+        safe_print("Creating an host: %s in instance %d" % (hname, inst_id))
 
         h = Host({})
         self.update_element(h, data)        
@@ -524,7 +526,7 @@ class Regenerator:
             print "Not good!", exp
             return
 
-        print "Creating an hostgroup: %s in instance %d" % (hgname, inst_id)
+        safe_print("Creating an hostgroup: %s in instance %d" % (hgname, inst_id))
         
         # With void members
         hg = Hostgroup([])
@@ -550,7 +552,7 @@ class Regenerator:
             print "Not good!", exp
             return
 
-        print "Creating a service: %s/%s in instance %d" % (hname, sdesc, inst_id)
+        safe_print("Creating a service: %s/%s in instance %d" % (hname, sdesc, inst_id))
 
         s = Service({})
         self.update_element(s, data)
@@ -590,7 +592,7 @@ class Regenerator:
             print "Not good!", exp
             return
 
-        print "Creating a servicegroup: %s in instance %d" % (sgname, inst_id)
+        safe_print("Creating a servicegroup: %s in instance %d" % (sgname, inst_id))
         
         # With void members
         sg = Servicegroup([])
@@ -611,12 +613,12 @@ class Regenerator:
     def manage_initial_contact_status_brok(self, b):
         data = b.data
         cname = data['contact_name']
-        print "Contact with data", data
+        safe_print("Contact with data", data)
         c = self.contacts.find_by_name(cname)
         if c:
             self.update_element(c, data)
         else:
-            print "Creating Contact:", cname
+            safe_print("Creating Contact:", cname)
             c = Contact({})
             self.update_element(c, data)
             self.contacts[c.id] = c
@@ -631,13 +633,13 @@ class Regenerator:
         # Same than for cotnacts. We create or
         # update
         nws = c.notificationways
-        print "Got notif ways", nws
+        safe_print("Got notif ways", nws)
         new_notifways = []
         for cnw in nws:
             nwname = cnw.notificationway_name
             nw = self.notificationways.find_by_name(nwname)
             if not nw:
-                print "Creating notif way", nwname
+                safe_print("Creating notif way", nwname)
                 nw = NotificationWay([])
                 self.notificationways[nw.id] = nw
             # Now update it
@@ -678,7 +680,7 @@ class Regenerator:
             print "Not good!", exp
             return
 
-        print "Creating an contactgroup: %s in instance %d" % (cgname, inst_id)
+        safe_print("Creating an contactgroup: %s in instance %d" % (cgname, inst_id))
         
         # With void members
         cg = Contactgroup([])
@@ -750,7 +752,6 @@ class Regenerator:
 
 
 
-
     def manage_initial_poller_status_brok(self, b):
         data = b.data
         poller_name = data['poller_name']
@@ -798,6 +799,21 @@ class Regenerator:
         #self.number_of_objects += 1
 
 
+    def manage_initial_receiver_status_brok(self, b):
+        data = b.data
+        receiver_name = data['receiver_name']
+        print "Creating Receiver:", receiver_name, data
+        receiver = ReceiverLink({})
+        print "Created a new receiver", receiver
+        self.update_element(receiver, data)
+        print "Updated receiver"
+        #print "CMD:", c
+        self.receivers[receiver_name] = receiver
+        print "receiver added"
+        #print "MONCUL: Add a new scheduler ", sched
+        #self.number_of_objects += 1
+
+
 
     # This brok is here when the WHOLE initial phase is done.
     # So we got all data, we can link all together :)
@@ -841,10 +857,16 @@ class Regenerator:
     def manage_update_host_status_brok(self, b):
         # There are some properties taht should nto change and are already linked
         # so just remove them
-        clean_prop = ['childs', 'parents', 'check_command', 'hostgroups',
-                      'contacts', 'notification_period', 'contact_groups', 'child_dependencies',
-                      'check_period', 'parent_dependencies', 'event_handler',
+        clean_prop = ['check_command', 'hostgroups',
+                      'contacts', 'notification_period', 'contact_groups',
+                      'check_period', 'event_handler',
                       'maintenance_period', 'realm', 'customs', 'escalations']
+
+        # some are only use when a topology change happened
+        toplogy_change = b.data['topology_change']
+        if not toplogy_change:
+            other_to_clean = ['childs', 'parents', 'child_dependencies', 'parent_dependencies']
+            clean_prop.extend(other_to_clean)
 
         data = b.data
         for prop in clean_prop:
@@ -859,6 +881,14 @@ class Regenerator:
             # We can have some change in our impacts and source problems.
             self.linkify_dict_srv_and_hosts(h, 'impacts')
             self.linkify_dict_srv_and_hosts(h, 'source_problems')
+            
+            # If the topology change, update it
+            if toplogy_change:
+                print "Topology change for", h.get_name(), h.parent_dependencies
+                self.linkify_host_and_hosts(h, 'parents')
+                self.linkify_host_and_hosts(h, 'childs')
+                self.linkify_dict_srv_and_hosts(h, 'parent_dependencies')
+                self.linkify_dict_srv_and_hosts(h, 'child_dependencies')
 
             # Relink downtimes and comments
             for dtc in h.downtimes + h.comments:
@@ -871,9 +901,15 @@ class Regenerator:
         # There are some properties taht should nto change and are already linked
         # so just remove them
         clean_prop = ['check_command', 'servicegroups',
-                      'contacts', 'notification_period', 'contact_groups', 'child_dependencies',
-                      'check_period', 'parent_dependencies', 'event_handler',
+                      'contacts', 'notification_period', 'contact_groups',
+                      'check_period', 'event_handler',
                       'maintenance_period', 'customs', 'escalations']
+
+        # some are only use when a topology change happened
+        toplogy_change = b.data['topology_change']
+        if not toplogy_change:
+            other_to_clean = ['child_dependencies', 'parent_dependencies']
+            clean_prop.extend(other_to_clean)
 
         data = b.data
         for prop in clean_prop:
@@ -889,6 +925,11 @@ class Regenerator:
             self.linkify_dict_srv_and_hosts(s, 'impacts')
             self.linkify_dict_srv_and_hosts(s, 'source_problems')
 
+            # If the topology change, update it
+            if toplogy_change:
+                self.linkify_dict_srv_and_hosts(s, 'parent_dependencies')
+                self.linkify_dict_srv_and_hosts(s, 'child_dependencies')
+
             # Relink downtimes and comments with the service
             for dtc in s.downtimes + s.comments:
                 dtc.ref = s
@@ -900,6 +941,16 @@ class Regenerator:
         broker_name = data['broker_name']
         try:
             s = self.brokers[broker_name]
+            self.update_element(s, data)
+        except Exception:
+            pass
+
+
+    def manage_update_receiver_status_brok(self, b):
+        data = b.data
+        receiver_name = data['receiver_name']
+        try:
+            s = self.receivers[receiver_name]
             self.update_element(s, data)
         except Exception:
             pass

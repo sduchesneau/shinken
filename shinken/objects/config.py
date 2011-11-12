@@ -59,6 +59,7 @@ from module import Module, Modules
 from discoveryrule import Discoveryrule, Discoveryrules
 from discoveryrun import Discoveryrun, Discoveryruns
 from hostextinfo import HostExtInfo, HostsExtInfo
+from serviceextinfo import ServiceExtInfo, ServicesExtInfo
 
 from shinken.arbiterlink import ArbiterLink, ArbiterLinks
 from shinken.schedulerlink import SchedulerLink, SchedulerLinks
@@ -226,7 +227,8 @@ class Config(Item):
         'idontcareaboutsecurity': BoolProp(default='0'),
         'flap_history': IntegerProp(default='20', class_inherit=[(Host, None), (Service, None)]),
         'max_plugins_output_length': IntegerProp(default='8192', class_inherit=[(Host, None), (Service, None)]),
-        
+        'no_event_handlers_during_downtimes': BoolProp(default='0', class_inherit=[(Host, None), (Service, None)]),
+
         # Interval between cleaning queues pass
         'cleaning_queues_interval' : IntegerProp(default='900'),
 
@@ -314,6 +316,7 @@ class Config(Item):
         'discoveryrule':    (Discoveryrule, Discoveryrules, 'discoveryrules'),
         'discoveryrun':     (Discoveryrun, Discoveryruns, 'discoveryruns'),
         'hostextinfo':      (HostExtInfo, HostsExtInfo, 'hostsextinfo'),
+        'serviceextinfo':   (ServiceExtInfo, ServicesExtInfo, 'servicesextinfo'),
     }
 
     #This tab is used to transform old parameters name into new ones
@@ -322,6 +325,8 @@ class Config(Item):
         'nagios_user':  'shinken_user',
         'nagios_group': 'shinken_group'
     }
+
+    read_config_silent = 0
 
     def __init__(self):
         self.params = {}
@@ -367,7 +372,7 @@ class Config(Item):
 
     def _cut_line(self, line):
         #punct = '"#$%&\'()*+/<=>?@[\\]^`{|}~'
-        tmp = re.split("[" + string.whitespace + "]+" , line)
+        tmp = re.split("[" + string.whitespace + "]+" , line, 1)
         r = [elt for elt in tmp if elt != '']
         return r
 
@@ -381,7 +386,8 @@ class Config(Item):
             #if the previous does not finish with a line return
             res += os.linesep
             res += '# IMPORTEDFROM=%s' % (file) + os.linesep
-            print "Opening configuration file", file
+            if self.read_config_silent == 0:
+               print "Opening configuration file ",file
             try:
                 # Open in Universal way for Windows, Mac, Linux
                 fd = open(file, 'rU')
@@ -457,7 +463,8 @@ class Config(Item):
                  'servicedependency', 'hostdependency', 'arbiter', 'scheduler',
                  'reactionner', 'broker', 'receiver', 'poller', 'realm', 'module', 
                  'resultmodulation', 'escalation', 'serviceescalation', 'hostescalation',
-                 'discoveryrun', 'discoveryrule', 'businessimpactmodulation', 'hostextinfo']
+                 'discoveryrun', 'discoveryrule', 'businessimpactmodulation',
+                 'hostextinfo','serviceextinfo']
         objectscfg = {}
         for t in types:
             objectscfg[t] = []
@@ -654,6 +661,8 @@ class Config(Item):
                                   self.resultmodulations, self.businessimpactmodulations, \
                                   self.escalations, self.servicegroups)
 
+        self.servicesextinfo.merge(self.services)
+
         #print "Service groups"
         # link servicegroups members with services
         self.servicegroups.linkify(self.services)
@@ -845,6 +854,8 @@ class Config(Item):
         self.timeperiods.apply_inheritance()
         #Also "Hostextinfo"
         self.hostsextinfo.apply_inheritance()
+        #Also "Serviceextinfo"
+        self.servicesextinfo.apply_inheritance()
 
 
     #Use to apply implicit inheritance
@@ -867,6 +878,7 @@ class Config(Item):
         self.resultmodulations.fill_default()
         self.businessimpactmodulations.fill_default()
         self.hostsextinfo.fill_default()
+        self.servicesextinfo.fill_default()
 
         #Also fill default of host/servicedep objects
         self.servicedependencies.fill_default()
@@ -1170,6 +1182,7 @@ class Config(Item):
         self.hostdependencies.linkify_templates()
         self.timeperiods.linkify_templates()
         self.hostsextinfo.linkify_templates()
+        self.servicesextinfo.linkify_templates()
 
 
 
@@ -1232,7 +1245,8 @@ class Config(Item):
             logger.log("check global parameters failed")
             
         for x in ('hosts', 'hostgroups', 'contacts', 'contactgroups', 'notificationways',
-                  'escalations', 'services', 'servicegroups', 'timeperiods', 'commands', 'hostsextinfo'):
+                  'escalations', 'services', 'servicegroups', 'timeperiods', 'commands',
+                  'hostsextinfo','servicesextinfo'):
             logger.log('Checking %s...' % (x))
             cur = getattr(self, x)
             if not cur.is_correct():
