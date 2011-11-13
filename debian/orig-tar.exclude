@@ -10,4 +10,12 @@ test/*
 contrib
 contrib/*
 
+for_fedora
+for_fedora/*
+
+for_packages
+for_packages/*
+
+windows
+windows/*
 
