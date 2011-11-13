@@ -26,6 +26,10 @@ case "$1" in
     ## Ensure shinken starts automatically
     update-rc.d shinken-arbiter defaults >/dev/null
 
+    ## Help message
+    echo "By default webui comes without any passwords configured, please"
+    echo "add a password line to a contact object"
+
     ;;
   abort-upgrade)
     # Back out of an attempt to upgrade this package FROM THIS VERSION
