@@ -106,6 +106,7 @@ class Service(SchedulingItem):
         'action_url':             StringProp (default='', fill_brok=['full_status']),
         'icon_image':             StringProp (default='', fill_brok=['full_status']),
         'icon_image_alt':         StringProp (default='', fill_brok=['full_status']),
+        'icon_set':               StringProp (default='', fill_brok=['full_status']),
         'failure_prediction_enabled': BoolProp(default='0', fill_brok=['full_status']),
         'parallelize_check':       BoolProp  (default='1', fill_brok=['full_status']),
 
@@ -113,7 +114,7 @@ class Service(SchedulingItem):
         'poller_tag':              StringProp(default='None'),
         'reactionner_tag':              StringProp(default='None'),
         'resultmodulations':       StringProp(default=''),
-        'criticitymodulations':    StringProp(default=''),
+        'business_impact_modulations':    StringProp(default=''),
         'escalations':             StringProp(default='', fill_brok=['full_status']),
         'maintenance_period':      StringProp(default='', fill_brok=['full_status']),
 
@@ -121,8 +122,8 @@ class Service(SchedulingItem):
         'duplicate_foreach':       StringProp(default=''),
         'default_value':           StringProp(default=''),
 
-        # Criticity value
-        'criticity':               IntegerProp(default='2', fill_brok=['full_status']),
+        # Business_Impact value
+        'business_impact':               IntegerProp(default='2', fill_brok=['full_status']),
     })
 
     # properties used in the running state
@@ -133,7 +134,7 @@ class Service(SchedulingItem):
         'in_checking':        BoolProp   (default=False, fill_brok=['full_status', 'check_result', 'next_schedule'], retention=True),
         'latency':            FloatProp  (default=0, fill_brok=['full_status', 'check_result'], retention=True,),
         'attempt':            IntegerProp(default=0, fill_brok=['full_status', 'check_result'],retention=True),
-        'state':              StringProp (default='PENDING', fill_brok=['full_status'], retention=True),
+        'state':              StringProp (default='PENDING', fill_brok=['full_status', 'check_result'], retention=True),
         'state_id':           IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
         'current_event_id':   IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
         'last_event_id':      IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
@@ -149,7 +150,7 @@ class Service(SchedulingItem):
         'last_time_critical': IntegerProp(default=int(time.time()), fill_brok =['full_status', 'check_result'], retention=True),
         'last_time_unknown':  IntegerProp(default=int(time.time()), fill_brok=['full_status', 'check_result'], retention=True),
         'duration_sec':       IntegerProp(default=0, fill_brok=['full_status'], retention=True),
-        'state_type':         StringProp (default='HARD', fill_brok=['full_status'], retention=True),
+        'state_type':         StringProp (default='HARD', fill_brok=['full_status', 'check_result'], retention=True),
         'state_type_id':      IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
         'output':             StringProp (default='', fill_brok=['full_status', 'check_result'], retention=True),
         'long_output':        StringProp (default='', fill_brok=['full_status', 'check_result'], retention=True),
@@ -181,7 +182,7 @@ class Service(SchedulingItem):
         'last_problem_id':    IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
         'current_problem_id': IntegerProp(default=0, fill_brok=['full_status', 'check_result'], retention=True),
         'execution_time':     FloatProp(default=0.0, fill_brok=['full_status', 'check_result'], retention=True),
-        'last_notification':  FloatProp(default=time.time(), fill_brok=['full_status'], retention=True),
+        'last_notification':  FloatProp(default=0.0, fill_brok=['full_status'], retention=True),
         'current_notification_number': IntegerProp(default=0, fill_brok=['full_status'],retention=True),
         'current_notification_id': IntegerProp(default=0, fill_brok=['full_status'], retention=True),
         'check_flapping_recovery_notification': BoolProp(default=True, fill_brok=['full_status'], retention=True),
@@ -206,8 +207,8 @@ class Service(SchedulingItem):
         # Problem/impact part
         'is_problem':         BoolProp   (default=False, fill_brok=['full_status']),
         'is_impact':          BoolProp   (default=False, fill_brok=['full_status']),
-        # the save value of our criticity for "problems"
-        'my_own_criticity':   IntegerProp(default=-1),
+        # the save value of our business_impact for "problems"
+        'my_own_business_impact':   IntegerProp(default=-1, fill_brok=['full_status']),
         # list of problems that make us an impact
         'source_problems':    ListProp   (default=[], fill_brok=['full_status'], brok_transformation=to_svc_hst_distinct_lists),
         # list of the impact I'm the cause of
@@ -233,14 +234,17 @@ class Service(SchedulingItem):
         # we are depending in a hostdependency
         # or even if we are businesss based.
         'parent_dependencies': StringProp(default=set(), brok_transformation=to_svc_hst_distinct_lists, fill_brok=['full_status']),
-        # Here it's the guys taht depend on us. So it's the total
-        # oposite of the parent_dependencies 
+        # Here it's the guys that depend on us. So it's the total
+        # opposite of the parent_dependencies 
         'child_dependencies': StringProp(brok_transformation=to_svc_hst_distinct_lists, default=set(), fill_brok=['full_status']),
 
-        # Manage the unkown/unreach during hard state
+        # Manage the unknown/unreach during hard state
         'in_hard_unknown_reach_phase': BoolProp(default=False, retention=True),
         'was_in_hard_unknown_reach_phase': BoolProp(default=False, retention=True),
         'state_before_hard_unknown_reach_phase': StringProp(default='OK', retention=True),
+
+        # Set if the element just change its father/son topology
+        'topology_change' : BoolProp(default=False, fill_brok=['full_status']),
         
     })
 
@@ -289,10 +293,13 @@ class Service(SchedulingItem):
     }
 
     # This tab is used to transform old parameters name into new ones
-    # so from Nagios2 format, to Nagios3 ones
+    # so from Nagios2 format, to Nagios3 ones.
+    # Or Shinken deprecated names like criticity
     old_properties = {
         'normal_check_interval':    'check_interval',
-        'retry_check_interval':     'retry_interval'
+        'retry_check_interval' :    'retry_interval',
+        'criticity'            :    'business_impact',
+#        'criticitymodulations' :    'business_impact_modulations',
     }
 
 ####### 
@@ -324,6 +331,14 @@ class Service(SchedulingItem):
     def get_dbg_name(self):
         return "%s/%s" % (self.host.host_name, self.service_description)
 
+    def get_full_name(self):
+        return "%s/%s" % (self.host.host_name, self.service_description)
+
+
+    # Get our realm, so in fact our host one
+    def get_realm(self):
+        return self.host.get_realm()
+
 
     # Check is required prop are set:
     # template are always correct
@@ -331,6 +346,8 @@ class Service(SchedulingItem):
     def is_correct(self):
         state = True # guilty or not? :)
         cls = self.__class__
+
+        source = getattr(self, 'imported_from', 'unknown')
 
         desc = getattr(self, 'service_description', 'unamed')
         hname = getattr(self, 'host_name', 'unamed')
@@ -356,7 +373,7 @@ class Service(SchedulingItem):
 
         # Ok now we manage special cases...
         if self.notifications_enabled and self.contacts == []:
-            logger.log("Warning The service '%s' in the host '%s' do not have contacts nor contact_groups" % (desc, hname))
+            logger.log("Warning The service '%s' in the host '%s' do not have contacts nor contact_groups in '%s'" % (desc, hname, source))
 
         if not hasattr(self, 'check_command'):
             logger.log("%s : I've got no check_command" % self.get_name())
@@ -392,9 +409,9 @@ class Service(SchedulingItem):
 
     # The service is dependent of his father dep
     # Must be AFTER linkify
-    def fill_daddy_dependancy(self):
+    def fill_daddy_dependency(self):
         #  Depend of host, all status, is a networkdep
-        # and do not have timeperiod, and folow parents dep
+        # and do not have timeperiod, and follow parents dep
         if self.host is not None:
             # I add the dep in MY list
             self.act_depend_of.append( (self.host,
@@ -411,8 +428,8 @@ class Service(SchedulingItem):
             self.host.register_son_in_parent_child_dependencies(self)
 
 
-    # Register the dependancy between 2 service for action (notification etc)
-    def add_service_act_dependancy(self, srv, status, timeperiod, inherits_parent):
+    # Register the dependency between 2 service for action (notification etc)
+    def add_service_act_dependency(self, srv, status, timeperiod, inherits_parent):
         # first I add the other the I depend on in MY list
         self.act_depend_of.append( (srv, status, 'logic_dep',
                                     timeperiod, inherits_parent) )
@@ -425,12 +442,12 @@ class Service(SchedulingItem):
 
 
 
-    # Register the dependancy between 2 service for action (notification etc)
+    # Register the dependency between 2 service for action (notification etc)
     # but based on a BUSINESS rule, so on fact:
     # ERP depend on database, so we fill just database.act_depend_of_me
     # because we will want ERP mails to go on! So call this
     # on the database service with the srv=ERP service
-    def add_business_rule_act_dependancy(self, srv, status, timeperiod, inherits_parent):
+    def add_business_rule_act_dependency(self, srv, status, timeperiod, inherits_parent):
         # I only register so he know that I WILL be a inpact
         self.act_depend_of_me.append( (srv, status, 'business_dep',
                                       timeperiod, inherits_parent) )
@@ -440,8 +457,8 @@ class Service(SchedulingItem):
 
 
 
-    # Register the dependancy between 2 service for checks
-    def add_service_chk_dependancy(self, srv, status, timeperiod, inherits_parent):
+    # Register the dependency between 2 service for checks
+    def add_service_chk_dependency(self, srv, status, timeperiod, inherits_parent):
         # first I add the other the I depend on in MY list
         self.chk_depend_of.append( (srv, status, 'logic_dep',
                                     timeperiod, inherits_parent) )
@@ -556,7 +573,7 @@ class Service(SchedulingItem):
         # we should put in last_state the good last state:
         # if not just change the state by an problem/impact
         # we can take current state. But if it's the case, the
-        # real old state is self.state_before_impact (it's teh TRUE
+        # real old state is self.state_before_impact (it's the TRUE
         # state in fact)
         # but only if the global conf have enable the impact state change
         cls = self.__class__
@@ -770,7 +787,7 @@ class Service(SchedulingItem):
 
     # See if the notification is launchable (time is OK and contact is OK too)
     def notification_is_blocked_by_contact(self, n, contact):
-        return not contact.want_service_notification(self.last_chk, self.state, n.type, self.criticity)
+        return not contact.want_service_notification(self.last_chk, self.state, n.type, self.business_impact)
 
 
     def get_duration_sec(self):
@@ -962,7 +979,7 @@ class Services(Items):
     # service -> timepriods
     # service -> contacts
     def linkify(self, hosts, commands, timeperiods, contacts,
-                resultmodulations, criticitymodulations, escalations,
+                resultmodulations, businessimpactmodulations, escalations,
                 servicegroups):
         self.linkify_with_timeperiods(timeperiods, 'notification_period')
         self.linkify_with_timeperiods(timeperiods, 'check_period')
@@ -973,7 +990,7 @@ class Services(Items):
         self.linkify_one_command_with_commands(commands, 'event_handler')
         self.linkify_with_contacts(contacts)
         self.linkify_with_resultmodulations(resultmodulations)
-        self.linkify_with_criticitymodulations(criticitymodulations)
+        self.linkify_with_business_impact_modulations(businessimpactmodulations)
         # WARNING: all escalations will not be link here
         # (just the escalation here, not serviceesca or hostesca).
         # This last one will be link in escalations linkify.
@@ -1038,20 +1055,13 @@ class Services(Items):
             del self.items[id]
 
 
-    # It's used to change old Nagios2 names to
-    # Nagios3 ones
-    def old_properties_names_to_new(self):
-        for s in self:
-            s.old_properties_names_to_new()
-
-
     # Apply implicit inheritance for special properties:
     # contact_groups, notification_interval , notification_period
     # So service will take info from host if necessery
     def apply_implicit_inheritance(self, hosts):
         for prop in ( 'contacts', 'contact_groups', 'notification_interval',
-                         'notification_period', 'resultmodulations', 'criticitymodulations', 'escalations',
-                         'poller_tag', 'reactionner_tag', 'check_period', 'criticity' ):
+                         'notification_period', 'resultmodulations', 'business_impact_modulations', 'escalations',
+                         'poller_tag', 'reactionner_tag', 'check_period', 'business_impact' ):
             for s in self:
                 if not s.is_tpl():
                     if not hasattr(s, prop) and hasattr(s, 'host_name'):
@@ -1073,10 +1083,10 @@ class Services(Items):
             s.get_customs_properties_by_inheritance(self)
 
 
-    # Create dependancies for services (daddy ones)
-    def apply_dependancies(self):
+    # Create dependencies for services (daddy ones)
+    def apply_dependencies(self):
         for s in self:
-            s.fill_daddy_dependancy()
+            s.fill_daddy_dependency()
 
 
     # Add in our queue a service create from another. Special case :

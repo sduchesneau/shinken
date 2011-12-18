@@ -25,6 +25,9 @@
 
 #It's ugly I know....
 from shinken_test import *
+# we have an external process, so we must un-fake time functions
+time.time = original_time_time
+time.sleep = original_time_sleep
 from worker import Worker
 from multiprocessing import Queue, Manager
 from objects.service import Service
@@ -44,8 +47,8 @@ class TestTimeout(ShinkenTest):
 
         # These queues connect a poller/reactionner with a worker
         to_queue = Queue()
-        manager = Manager()
-        from_queue = manager.list()
+#        manager = Manager()
+        from_queue = Queue()#manager.list()
         control_queue = Queue()
 
 
@@ -88,7 +91,7 @@ class TestTimeout(ShinkenTest):
 
         # The worker should have finished it's job now, either correctly or
         # with a timeout
-        o = from_queue.pop()
+        o = from_queue.get()
 
         self.assert_(o.status == 'timeout')
         self.assert_(o.exit_status == 3)

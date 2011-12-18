@@ -92,10 +92,17 @@ class SchedulingItem(Item):
     # Add a flapping change, but no more than 20 states
     # Then update the self.is_flapping bool by calling update_flapping
     def add_flapping_change(self, b):
+        cls = self.__class__
+
+        # If this element is not in flapping check, or
+        # the flapping is globally disable, bailout
+        if not self.flap_detection_enabled or not cls.enable_flap_detection:
+            return
+
         self.flapping_changes.append(b)
 
         # Keep just 20 changes (global flap_history value)
-        flap_history = self.__class__.flap_history
+        flap_history = cls.flap_history
 
         if len(self.flapping_changes) > flap_history:
             self.flapping_changes.pop(0)
@@ -208,46 +215,46 @@ class SchedulingItem(Item):
                         # Make element unique in this list
                         self.impacts = list(set(self.impacts))
 
-        # We can update our criticity value now
-        self.update_criticity_value()
+        # We can update our business_impact value now
+        self.update_business_impact_value()
 
         # And we register a new broks for update status
         b = self.get_update_status_brok()
         self.broks.append(b)
 
 
-    # We update our 'criticity' value with the max of
-    # the impacts criticy if we got impacts. And save our 'configuration'
-    # criticity if we do not have do it before
+    # We update our 'business_impact' value with the max of
+    # the impacts business_impact if we got impacts. And save our 'configuration'
+    # business_impact if we do not have do it before
     # If we do not have impacts, we revert our value
-    def update_criticity_value(self):
-        # First save our criticity if not already do
-        if self.my_own_criticity == -1:
-            self.my_own_criticity = self.criticity
+    def update_business_impact_value(self):
+        # First save our business_impact if not already do
+        if self.my_own_business_impact == -1:
+            self.my_own_business_impact = self.business_impact
 
         # We look at our crit modulations. If one apply, we take apply it
         # and it's done
         in_modulation = False
-        for cm in self.criticitymodulations:
+        for cm in self.business_impact_modulations:
             now = time.time()
             period = cm.modulation_period
             if period is None or period.is_time_valid(now):                    
-                #print "My self", self.get_name(), "go from crit", self.criticity, "to crit", cm.criticity
-                self.criticity = cm.criticity
+                #print "My self", self.get_name(), "go from crit", self.business_impact, "to crit", cm.business_impact
+                self.business_impact = cm.business_impact
                 in_modulation = True
                 # We apply the first available, that's all
                 break
 
-        # If we trully have impacts, we get the max criticity
+        # If we trully have impacts, we get the max business_impact
         # if it's huge than ourselve
         if len(self.impacts) != 0:
-            self.criticity = max(self.criticity, max([e.criticity for e in self.impacts]))
+            self.business_impact = max(self.business_impact, max([e.business_impact for e in self.impacts]))
             return
 
         # If we are not a problem, we setup our own_crit if we are not in a 
         # modulation period
-        if self.my_own_criticity != -1 and not in_modulation:
-            self.criticity = self.my_own_criticity
+        if self.my_own_business_impact != -1 and not in_modulation:
+            self.business_impact = self.my_own_business_impact
             
 
 
@@ -264,11 +271,11 @@ class SchedulingItem(Item):
             # we can just drop our impacts list
             self.impacts = []
 
-        # We update our criticy value, it's not a huge thing :)
-        self.update_criticity_value()
+        # We update our business_impact value, it's not a huge thing :)
+        self.update_business_impact_value()
 
         # If we were a problem, we say to everyone
-        # our new status, with good criticity value
+        # our new status, with good business_impact value
         if was_pb:
             # And we register a new broks for update status
             b = self.get_update_status_brok()
@@ -331,8 +338,8 @@ class SchedulingItem(Item):
     def deregister_a_problem(self, pb):
         self.source_problems.remove(pb)
 
-        # For know if we are still an impact, maybe our dependancies
-        # are not aware of teh remove of the impact state because it's not ordered
+        # For know if we are still an impact, maybe our dependencies
+        # are not aware of the remove of the impact state because it's not ordered
         # so we can just look at if we still have some problem in our list
         if len(self.source_problems) == 0:
             self.is_impact = False
@@ -348,7 +355,7 @@ class SchedulingItem(Item):
     # action can be raise or not by viewing dep status
     # network_dep have to be all raise to be no action
     # logic_dep : just one is enouth
-    def is_no_action_dependant(self):
+    def is_no_action_dependent(self):
         # Use to know if notif is raise or not
         # no_action = False
         parent_is_down = []
@@ -393,7 +400,8 @@ class SchedulingItem(Item):
                 parent_is_down.append(p_is_down)
 
         # if a parent is not down, no dep can explain the pb
-        if False in parent_is_down:
+        # or if we do'nt have any parents
+        if len(parent_is_down) == 0 or False in parent_is_down:
             return
         else:# every parents are dead, so... It's not my fault :)
             self.set_unreachable()
@@ -426,7 +434,7 @@ class SchedulingItem(Item):
 
     # Use to know if my dep force me not to be checked
     # So check the chk_depend_of if they raise me
-    def is_no_check_dependant(self):
+    def is_no_check_dependent(self):
         now = time.time()
         for (dep, status, type, tp, inh_parent) in self.chk_depend_of:
             if tp is None or tp.is_time_valid(now):
@@ -437,7 +445,7 @@ class SchedulingItem(Item):
 
     # call by a bad consume check where item see that he have dep
     # and maybe he is not in real fault.
-    def raise_dependancies_check(self, ref_check):
+    def raise_dependencies_check(self, ref_check):
         now = time.time()
         cls = self.__class__
         checks = []
@@ -541,6 +549,19 @@ class SchedulingItem(Item):
             val = max(0, val + difference) #diff can be -
             setattr(self, p, val)
 
+    # For disabling active checks, we need to set active_checks_enabled
+    # to false, but also make a dummy current checks attempts so the
+    # effect is imediate.
+    def disable_active_checks(self):
+        self.active_checks_enabled = False
+        for c in self.checks_in_progress:
+            c.status = 'waitconsume'
+            c.exit_status = self.state_id
+            c.output = self.output
+            c.check_time = time.time()
+            c.execution_time = 0
+            c.perf_data = self.perf_data
+
 
     def remove_in_progress_check(self, c):
         # The check is consume, uptade the in_checking propertie
@@ -576,6 +597,11 @@ class SchedulingItem(Item):
         # The external command always pass
         # if not, only if we enable them (auto launch)
         if self.event_handler is None or ((not self.event_handler_enabled or not cls.enable_event_handlers) and not externalcmd):
+            return
+        
+        # If we do not force and we are in downtime, bailout
+        # if the no_event_handlers_during_downtimes is 1 in conf
+        if cls.no_event_handlers_during_downtimes and not externalcmd and self.in_scheduled_downtime:
             return
 
         m = MacroResolver()
@@ -618,7 +644,7 @@ class SchedulingItem(Item):
             self.in_hard_unknown_reach_phase = False
 
         # So if we are not in already in such a phase, we check for
-        # a start or not. So here we are sure to be in a HARD/HARD folowing
+        # a start or not. So here we are sure to be in a HARD/HARD following
         # state
         if not self.in_hard_unknown_reach_phase:
             if self.state == 'UNKNOWN' and self.last_state != 'UNKNOWN' \
@@ -658,12 +684,15 @@ class SchedulingItem(Item):
 
         # Same for current output
         # TODO : remove in future version, this is need only for
-        # migration from old shinken version, that got outpout as str
+        # migration from old shinken version, that got output as str
         # and not unicode
         # if str, go in unicode
         if isinstance(self.output, str):
             self.output = self.output.decode('utf8', 'ignore')
             self.long_output = self.long_output.decode('utf8', 'ignore')
+
+        if isinstance(c.perf_data, str):
+            c.perf_data = c.perf_data.decode('utf8', 'ignore')
 
         # We check for stalking if necessery
         # so if check is here
@@ -704,8 +733,8 @@ class SchedulingItem(Item):
         if c.exit_status != 0 and c.status == 'waitconsume' and len(self.act_depend_of) != 0:
             c.status = 'waitdep'
             # Make sure the check know about his dep
-            # C is my check, and he wants dependancies
-            checks_id = self.raise_dependancies_check(c)
+            # C is my check, and he wants dependencies
+            checks_id = self.raise_dependencies_check(c)
             for check_id in checks_id:
                 # Get checks_id of dep
                 c.depend_on.append(check_id)
@@ -729,7 +758,7 @@ class SchedulingItem(Item):
             c.status = 'havetoresolvedep'
 
         # if finish, check need to be set to a zombie state to be removed
-        # it can be change if necessery before return, like for dependancies
+        # it can be change if necessery before return, like for dependencies
         if c.status == 'waitconsume' and c.depend_on_me == []:
             c.status = 'zombie'
 
@@ -743,7 +772,7 @@ class SchedulingItem(Item):
             else:
                 c.status = 'zombie'
             # Check deps
-            no_action = self.is_no_action_dependant()
+            no_action = self.is_no_action_dependent()
             # We recheck just for network_dep. Maybe we are just unreachable
             # and we need to overide the state_id
             self.check_and_set_unreachability()
@@ -752,7 +781,7 @@ class SchedulingItem(Item):
         if c.exit_status == 0 and self.last_state in (OK_UP, 'PENDING'):
             #print "Case 1 (OK following a previous OK) : code:%s last_state:%s" % (c.exit_status, self.last_state)
             self.unacknowledge_problem()
-            # action in return can be notification or other checks (dependancies)
+            # action in return can be notification or other checks (dependencies)
             if (self.state_type == 'SOFT') and self.last_state != 'PENDING':
                 if self.is_max_attempts() and self.state_type == 'SOFT':
                     self.state_type = 'HARD'
@@ -994,7 +1023,6 @@ class SchedulingItem(Item):
 
         # We search since when we are in notification for escalations
         # that are based on time
-        in_notif_time = cls.interval_length * self.first_notification_delay + (n.notif_nb-1) * self.notification_interval
         in_notif_time = time.time() - n.creation_time
 
         # Check is an escalation match the current_notification_number
@@ -1140,7 +1168,7 @@ class SchedulingItem(Item):
                 rt = cmd.reactionner_tag
                 child_n = Notification(n.type, 'scheduled', 'VOID', cmd, self,
                     contact, n.t_to_go, timeout=cls.notification_timeout,
-                    notif_nb=n.notif_nb, reactionner_tag=rt )
+                    notif_nb=n.notif_nb, reactionner_tag=rt, module_type=cmd.module_type )
                 if not self.notification_is_blocked_by_contact(child_n, contact):
                     # Update the notification with fresh status information
                     # of the item. Example: during the notification_delay
@@ -1165,7 +1193,7 @@ class SchedulingItem(Item):
         cls = self.__class__
 
         # if I'm already in checking, Why launch a new check?
-        # If ref_check_id is not None , this is a dependancy_ check
+        # If ref_check_id is not None , this is a dependency_ check
         # If none, it might be a forced check, so OK, I do a new
         if not force and (self.in_checking and ref_check is not None):
             now = time.time()
@@ -1175,7 +1203,7 @@ class SchedulingItem(Item):
             c_in_progress.depend_on_me.append(ref_check)
             return c_in_progress.id
 
-        if force or (not self.is_no_check_dependant()):
+        if force or (not self.is_no_check_dependent()):
             # Get the command to launch
             m = MacroResolver()
             data = self.get_data_for_checks()
@@ -1284,7 +1312,7 @@ class SchedulingItem(Item):
             for e in elts:
                 #print "I register to the element", e.get_name()
                 # all states, every timeperiod, and inherit parents
-                e.add_business_rule_act_dependancy(self, ['d', 'u', 's', 'f', 'c', 'w'], None, True)
+                e.add_business_rule_act_dependency(self, ['d', 'u', 's', 'f', 'c', 'w'], None, True)
 
 
     def rebuild_ref(self):

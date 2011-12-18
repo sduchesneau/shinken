@@ -22,7 +22,8 @@
 
 from item import Item, Items
 
-from shinken.property import StringProp
+from shinken.property import StringProp, ListProp
+from shinken.util import strip_and_uniq
 
 class Module(Item):
     id = 1#0 is always special in database, so we do not take risk here
@@ -32,9 +33,8 @@ class Module(Item):
     properties.update({
         'module_name': StringProp(),
         'module_type': StringProp(),
+        'modules'    : ListProp(default=''),
     })
-    
-    running_properties = {}
 
     macros = {}
 
@@ -49,7 +49,30 @@ class Modules(Items):
     inner_class = Module
 
     def linkify(self):
-        pass
+        self.linkify_s_by_plug()
+
+
+    def linkify_s_by_plug(self):
+        for s in self:
+            new_modules = []
+            mods = s.modules.split(',')
+            mods = strip_and_uniq(mods)
+            for plug_name in mods:
+                plug_name = plug_name.strip()
+
+                # don't read void names
+                if plug_name == '':
+                    continue
+
+                # We are the modules, we search them :)
+                plug = self.find_by_name(plug_name)
+                if plug is not None:
+                    new_modules.append(plug)
+                else:
+                    err = "Error : the module %s is unknown for %s" % (plug_name, s.get_name())
+                    print "err", err
+                    s.configuration_errors.append(err)
+            s.modules = new_modules
 
 
     #We look for contacts property in contacts and

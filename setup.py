@@ -203,24 +203,18 @@ class build_config(Command):
         # Open a /etc/*d.ini file and change the ../var occurence with a
         # good value from the configuration file
         
-        for name in daemon_ini_files:
+        for (dname, name) in daemon_ini_files:
             inname = os.path.join('etc', name)
             outname = os.path.join(self.build_dir, name)
             log.info('updating path in %s : to "%s"' % (outname, self.var_path))
-            
-            if False:
-                ## disabled for now:
-                ## all daemons are now using relative paths by default 
-                ## (relative to the "VAR" one of /etc/default/shinken)
-                update_file_with_string(inname, outname,
-                                    "../var", self.var_path)
             
             # but we have to force the user/group & workdir values still:
             append_file_with(inname, outname, """
 user=%s
 group=%s
 workdir=%s
-""" % ( self.owner, self.group, self.var_path, ))
+pidfile=%s/%sd.pid
+""" % ( self.owner, self.group, self.var_path, self.run_path, dname))
 
         # And now the resource.cfg path with the value of libexec path
         # Replace the libexec path by the one in the parameter file
@@ -239,19 +233,26 @@ workdir=%s
             outname = os.path.join(self.build_dir, name)
             log.info('updating path in %s', outname)
             
-            if False:
-                ## disabled for now :
-                ## nagios.cfg & shinken-specific use now relative paths (relative to the "VAR" one) 
-                update_file_with_string(inname, outname,
-                                    "/usr/local/shinken/var",
-                                    self.var_path)
             
             ## but we HAVE to set the shinken_user & shinken_group to thoses requested :
             append_file_with(inname, outname, """
 shinken_user=%s
 shinken_group=%s
-""" % ( self.owner, self.group )
+lock_file=%s/arbiterd.pid
+local_log=%s/arbiterd.log
+""" % ( self.owner, self.group, self.run_path, self.log_path )
             )
+        
+        # UPDATE Shinken-specific.cfg files too
+        for name in additionnal_config_files:
+            inname = os.path.join('etc', name)
+            outname = os.path.join(self.build_dir, name)
+            # And update the default log path too
+            log.info('updating log path in %s', outname)
+            update_file_with_string(inname, outname,
+                                    "nagios.log",
+                                    "%s/nagios.log" % self.log_path)
+
 
 class install_config(Command):
     description = "install the shinken config files"
@@ -363,6 +364,17 @@ def append_file_with(infilename, outfilename, append_string):
     f.close()
 
 
+def gen_data_files(*dirs):
+    results = []
+    
+    for src_dir in dirs:
+        #print "Getting all files from", src_dir
+        for root,dirs,files in os.walk(src_dir):
+            for file in files:
+                results.append(os.path.join(root, file))
+    return results
+
+
 def update_file_with_string(infilename, outfilename, match, new_string):
     f = open(infilename)
     buf = f.read()
@@ -410,27 +422,41 @@ etc_root = os.path.dirname(default_paths['etc'])
 
 # nagios/shinken global config
 main_config_files = ('nagios.cfg',
-                     'nagios-windows.cfg',
-                     'shinken-specific.cfg',
-                     'shinken-specific-high-availability.cfg',
-                     'shinken-specific-load-balanced-only.cfg',
-                     )
+                     'nagios-windows.cfg')
+
+additionnal_config_files = ('shinken-specific.cfg',
+                            'shinken-specific-high-availability.cfg',
+                            'shinken-specific-load-balanced-only.cfg'
+                            )
 
 # daemon configs
-daemon_ini_files = ('brokerd.ini',
-                    'brokerd-windows.ini',
-                    'receiverd.ini',
-                    'receiverd-windows.ini',
-                    'pollerd.ini',
-                    'pollerd-windows.ini',
-                    'reactionnerd.ini',
-                    'schedulerd.ini',
-                    'schedulerd-windows.ini',
+daemon_ini_files = (('broker', 'brokerd.ini'),
+                    ('broker', 'brokerd-windows.ini'),
+                    ('receiver', 'receiverd.ini'),
+                    ('receiver', 'receiverd-windows.ini'),
+                    ('poller', 'pollerd.ini'),
+                    ('poller', 'pollerd-windows.ini'),
+                    ('reactionner', 'reactionnerd.ini'),
+                    ('reactionner', 'reactionnerd-windows.ini'),
+                    ('scheduler', 'schedulerd.ini'),
+                    ('scheduler', 'schedulerd-windows.ini'),
                     )
 
 resource_cfg_files = ('resource.cfg', )
 
+# Ok, for the webui files it's a bit tricky. we need to add all of them in
+#the package_data of setup(), but from a point of view of the
+# module shinken, so the directory shinken... but without movingfrom pwd!
+# so : sorry for the replace, really... I HATE SETUP()!
+full_path_webui_files = gen_data_files('shinken/webui')
+webui_files = [s.replace('shinken/webui/', 'webui/') for s in full_path_webui_files]
 
+
+package_data = ['*.py','modules/*.py','modules/*/*.py']
+package_data.extend(webui_files)
+
+
+print "All package _data"
 if __name__ == "__main__":
     
     setup(
@@ -442,9 +468,9 @@ if __name__ == "__main__":
         },
       
         name = "Shinken",
-        version = "0.6",
+        version = "0.8",
         packages = find_packages(),
-        package_data = {'':['*.py','modules/*.py','modules/*/*.py']},
+        package_data = {'' : package_data},
         description = "Shinken is a monitoring tool compatible with Nagios configuration and plugins",
         long_description=open('README').read(),
         author = "Gabes Jean",
@@ -477,6 +503,7 @@ if __name__ == "__main__":
                 [ # other configs
                     'etc/commands.cfg',
                     'etc/contactgroups.cfg',
+                    'etc/contacts.cfg',
                     'etc/dependencies.cfg',
                     'etc/escalations.cfg',
                     'etc/hostgroups.cfg',
@@ -491,16 +518,12 @@ if __name__ == "__main__":
             ),
 
             ( 
-                os.path.join(default_paths['etc'], 'objects', 'hosts' ),
-                glob('etc/objects/hosts/[!_]*.cfg')
+                os.path.join(default_paths['etc'], 'hosts' ),
+                glob('etc/hosts/[!_]*.cfg')
             ),
             (
-                os.path.join(default_paths['etc'], 'objects', 'services'),
-                glob('etc/objects/services/[!_]*.cfg')
-            ),
-            (
-                os.path.join(default_paths['etc'], 'objects', 'contacts'),
-                glob('etc/objects/contacts/[!_]*.cfg')
+                os.path.join(default_paths['etc'], 'services'),
+                glob('etc/services/[!_]*.cfg')
             ),
             
             (   os.path.join(default_paths['etc'], 'objects', 'discovery'), tuple() ), 
@@ -532,7 +555,15 @@ if __name__ == "__main__":
                 default_paths['var'], 
                 [ 'var/void_for_git' ]
             ),
-
+            (
+                default_paths['run'],
+                [ 'var/void_for_git' ]
+            ),
+            (
+                default_paths['log'],
+                [ 'var/void_for_git' ]
+            )
+            ,
             (
                 default_paths['libexec'], ['libexec/check.sh']
             ),

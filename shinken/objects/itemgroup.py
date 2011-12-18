@@ -27,6 +27,7 @@
 from item import Item, Items
 
 from shinken.brok import Brok
+from shinken.util import safe_print
 from shinken.property import StringProp
 
 
@@ -108,6 +109,11 @@ class Itemgroup(Item):
     def __iter__(self):
         return self.members.__iter__()
 
+    def __delitem__(self, i):
+        try:
+            self.members.remove(i)
+        except ValueError:
+            pass
 
     #a item group is correct if all members actually exists,
     #so if unknown_members is still []
@@ -116,7 +122,7 @@ class Itemgroup(Item):
 
         if self.unknown_members != []:
             for m in self.unknown_members:
-                print "Error : the", self.__class__.my_type, self.get_name(), "got a unknown member" , m
+                safe_print("Error : the", self.__class__.my_type, self.get_name(), "got a unknown member" , m)
             res = False
 
         if self.configuration_errors != []:
@@ -153,7 +159,7 @@ class Itemgroup(Item):
 
 class Itemgroups(Items):            
 
-    #If a prop is absent and is not required, put the default value
+    # If a prop is absent and is not required, put the default value
     def fill_default(self):
         for i in self:
             i.fill_default()
@@ -168,3 +174,5 @@ class Itemgroups(Items):
         if g is None:
             return []
         return getattr(g, 'members', [])
+
+    

@@ -48,7 +48,7 @@ class TestConfig(ShinkenTest):
         data = svc.get_data_for_checks()
         com = mr.resolve_command(svc.check_command, data)
         print com
-        self.assert_(com == "plugins/test_servicecheck.pl --type=ok --failchance=5% --previous-state=PENDING --state-duration=0 --total-critical-on-host=0 --total-warning-on-host=0 --hostname test_host_0 --servicedesc test_ok_0")
+        self.assert_(com == "plugins/test_servicecheck.pl --type=ok --failchance=5% --previous-state=PENDING --state-duration=0 --total-critical-on-host=0 --total-warning-on-host=0 --hostname test_host_0 --servicedesc test_ok_0 --custom custvalue")
 
 
     #Here call with a special macro TOTALHOSTSUP
@@ -94,6 +94,8 @@ class TestConfig(ShinkenTest):
         self.assert_(env != {})
         self.assert_(env['NAGIOS_HOSTNAME'] == 'test_host_0')
         self.assert_(env['NAGIOS_SERVICEPERCENTCHANGE'] == '0.0')
+        self.assert_(env['NAGIOS__SERVICECUSTNAME'] == 'custvalue')
+        self.assert_(env['NAGIOS__HOSTOSTYPE'] == 'gnulinux')
 
 
     def test_resource_file(self):
@@ -111,6 +113,16 @@ class TestConfig(ShinkenTest):
         print "CUCU", com
         self.assert_(com == 'plugins/nothing interestingvalue')
 
+        # Look for multiple = in lines, should split the first
+        # and keep others in the macro value
+        dummy_call = "special_macro!$ANOTHERVALUE$"
+        cc = CommandCall(self.conf.commands, dummy_call)
+        com = mr.resolve_command(cc, data)
+        print "CUCU", com
+        self.assert_(com == 'plugins/nothing blabla=toto')
+
+
+        
 
 if __name__ == '__main__':
     unittest.main()

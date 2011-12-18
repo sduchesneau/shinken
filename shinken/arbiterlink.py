@@ -24,6 +24,8 @@ import socket
 
 from shinken.satellitelink import SatelliteLink, SatelliteLinks
 from shinken.property import BoolProp, IntegerProp, StringProp, ListProp
+import shinken.pyro_wrapper as pyro
+Pyro = pyro.Pyro
 
 from shinken.log import logger
 
@@ -41,6 +43,10 @@ class ArbiterLink(SatelliteLink):
         return self.arbiter_name
 
 
+    def get_config(self):
+        return self.con.get_config()
+
+
     #Check is required prop are set:
     #contacts OR contactgroups is need
     def is_correct(self):
@@ -55,7 +61,7 @@ class ArbiterLink(SatelliteLink):
 
 
     def is_me(self):
-        logger.log("And arbiter is launched with the hostname:%s of addr :%s" % (self.host_name, socket.gethostname()), print_it=False)
+        logger.log("And arbiter is launched with the hostname:%s from an arbiter point of view of addr :%s" % (self.host_name, socket.gethostname()), print_it=False)
         return self.host_name == socket.gethostname()
 
 
@@ -75,6 +81,47 @@ class ArbiterLink(SatelliteLink):
         except Pyro.errors.ProtocolError , exp:
             self.con = None
             return False
+
+    def get_satellite_list(self, daemon_type):
+        if self.con is None:
+            self.create_connection()
+        try:
+            r = self.con.get_satellite_list(daemon_type)
+            return r
+        except Pyro.errors.URIError , exp:
+            self.con = None
+            return []
+        except Pyro.errors.ProtocolError , exp:
+            self.con = None
+            return []
+
+    def get_satellite_status(self, daemon_type, name):
+        if self.con is None:
+            self.create_connection()
+        try:
+            r = self.con.get_satellite_status(daemon_type, name)
+            return r
+        except Pyro.errors.URIError , exp:
+            self.con = None
+            return {}
+        except Pyro.errors.ProtocolError , exp:
+            self.con = None
+            return {}
+
+
+    def get_all_states(self):
+        if self.con is None:
+            self.create_connection()
+        try:
+            r = self.con.get_all_states()
+            return r
+        except Pyro.errors.URIError , exp:
+            self.con = None
+            return None
+        except Pyro.errors.ProtocolError , exp:
+            self.con = None
+            return None
+
 
 
 

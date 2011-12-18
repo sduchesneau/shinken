@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 #Copyright (C) 2009 Gabes Jean, naparuba@gmail.com
 #    Gerhard Lausser, Gerhard.Lausser@consol.de
 #    Gregory Starck, g.starck@gmail.com
@@ -28,6 +29,7 @@ import shutil
 import os
 import time
 import re
+import codecs
 
 
 from shinken.basemodule import BaseModule
@@ -71,16 +73,16 @@ class Npcd_broker(BaseModule):
 
         if self.config_file and not self.process_config_file():
             print "npcdmod: An error occurred process your config file. Check your perfdata_file or perfdata_spool_dir"
-            raise
+            raise BaseException('npcdmod: An error occurred process your config file. Check your perfdata_file or perfdata_spool_dir')
         if not self.perfdata_spool_dir and not self.perfdata_file:
             print "npcdmod: An error occurred while attempting to process module arguments"
-            raise
+            raise BaseException('npcdmod: An error occurred while attempting to process module arguments')
         try:
             # We open the file with line buffering, so we can better watch it with tail -f
-            self.logfile = open(self.perfdata_file, 'a', 1)
+            self.logfile = codecs.open(self.perfdata_file, 'a','utf-8','replace', 1)
         except:
             print "could not open file %s" % self.perfdata_file
-            raise
+            raise BaseException('could not open file %s" % self.perfdata_file')
         # use so we do nto ask a reinit ofan instance too quickly
         self.last_need_data_send = time.time()
 
@@ -91,7 +93,7 @@ class Npcd_broker(BaseModule):
         # one a minute
         if time.time() - self.last_need_data_send > 60:
             print "I ask the broker for instance id data :", c_id
-            msg = Message(id=0, type='NeedData', data={'full_instance_id' : c_id})
+            msg = Message(id=0, type='NeedData', data={'full_instance_id' : c_id}, source=self.get_name())
             self.from_q.put(msg)
             self.last_need_data_send = time.time()
         return
@@ -140,7 +142,7 @@ class Npcd_broker(BaseModule):
     # A host check has just arrived. Write the performance data to the file
     def manage_host_check_result_brok(self, b):
         #If we don't know about the host or the service, ask for a full init phase!
-        if not b.data['host_name'] in self.service_commands:
+        if not b.data['host_name'] in self.host_commands:
             self.ask_reinit(b.data['instance_id'])
             return
 
@@ -197,7 +199,7 @@ class Npcd_broker(BaseModule):
             if os.path.exists(self.perfdata_file) and os.path.getsize(self.perfdata_file) > 0:
                 print "moving perfdata_file %s (%d lines) to %s" % (self.perfdata_file, self.processed_lines, target)
                 shutil.move(self.perfdata_file, target)
-            self.logfile = open(self.perfdata_file, 'a', 1)
+            self.logfile = codecs.open(self.perfdata_file, 'a','utf-8','replace', 1)
         except OSError:
             print "could not rotate perfdata_file to %s" % target
             raise

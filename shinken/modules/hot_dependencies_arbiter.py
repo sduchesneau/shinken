@@ -64,7 +64,7 @@ def get_instance(plugin):
 
 
 # Get hosts and/or services dep by launching a command
-# or read a flat file as json format taht got theses links
+# or read a flat file as json format that got theses links
 class Hot_dependencies_arbiter(BaseModule):
     def __init__(self, modconf, mapping_file, mapping_command, mapping_command_interval, mapping_command_timeout, in_debug=False):
         BaseModule.__init__(self, modconf)
@@ -180,10 +180,10 @@ class Hot_dependencies_arbiter(BaseModule):
     #Ok, main function that will load dep from a json file
     def hook_late_configuration(self, arb):
         # We will return external commands to the arbiter, so
-        # it can jsut manage it easily and in a generic way
+        # it can just manage it easily and in a generic way
         ext_cmds = []
         
-        # If the file do not exist, we launc hthe command
+        # If the file do not exist, we launch the command
         # and we bail out
         if not self._is_file_existing():
             self._launch_command()
@@ -205,7 +205,7 @@ class Hot_dependencies_arbiter(BaseModule):
                     if not son.is_linked_with_host(father):
                         self.debug("Doing simple link between %s and %s" % (son.get_name(), father.get_name()))
                         # Add a dep link between the son and the father
-                        son.add_host_act_dependancy(father, ['w', 'u', 'd'], None, True)
+                        son.add_host_act_dependency(father, ['w', 'u', 'd'], None, True)
                 else:
                     self.debug("Missing one of %s %s" % (son_name, father_name))
 

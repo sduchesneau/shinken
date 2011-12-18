@@ -24,7 +24,7 @@
 """ Config is the class to read, load and manipulate the user
  configuration. It read a main cfg (nagios.cfg) and get all informations
  from it. It create objects, make link between them, clean them, and cut
- them into independant parts. The main user of this is Arbiter, but schedulers
+ them into independent parts. The main user of this is Arbiter, but schedulers
  use it too (but far less)"""
 
 import re
@@ -35,6 +35,7 @@ import socket
 import itertools
 import time
 import random
+from StringIO import StringIO
 
 
 from item import Item
@@ -42,7 +43,7 @@ from timeperiod import Timeperiod, Timeperiods
 from service import Service, Services
 from command import Command, Commands
 from resultmodulation import Resultmodulation, Resultmodulations
-from criticitymodulation import Criticitymodulation, Criticitymodulations
+from businessimpactmodulation import Businessimpactmodulation, Businessimpactmodulations
 from escalation import Escalation, Escalations
 from serviceescalation import Serviceescalation, Serviceescalations
 from hostescalation import Hostescalation, Hostescalations
@@ -58,6 +59,8 @@ from hostdependency import Hostdependency, Hostdependencies
 from module import Module, Modules
 from discoveryrule import Discoveryrule, Discoveryrules
 from discoveryrun import Discoveryrun, Discoveryruns
+from hostextinfo import HostExtInfo, HostsExtInfo
+from serviceextinfo import ServiceExtInfo, ServicesExtInfo
 
 from shinken.arbiterlink import ArbiterLink, ArbiterLinks
 from shinken.schedulerlink import SchedulerLink, SchedulerLinks
@@ -92,6 +95,9 @@ class Config(Item):
     # *usage_text : if present, will print it to explain why it's no more useful
     properties = {
         'prefix':                   StringProp(default='/usr/local/shinken/'),
+        'workdir':                  StringProp(default=''),
+        'use_local_log':            BoolProp(default='1'),
+        'local_log':                StringProp(default='arbiterd.log'),
         'log_file':                 UnusedProp(text=no_longer_used_txt),
         'object_cache_file':        UnusedProp(text=no_longer_used_txt),
         'precached_object_file':    UnusedProp(text='Shinken is faster enough to do not need precached object file.'),
@@ -152,7 +158,7 @@ class Config(Item):
         'auto_reschedule_checks':   BoolProp(managed=False, default='1'),
         'auto_rescheduling_interval': IntegerProp(managed=False, default='1'),
         'auto_rescheduling_window': IntegerProp(managed=False, default='180'),
-        'use_aggressive_host_checking': UnusedProp(text='Host agressive checking is an heritage from Nagios 1 and is really useless now.'),
+        'use_aggressive_host_checking': BoolProp(default='0', class_inherit=[(Host, None)]),
         'translate_passive_host_checks': BoolProp(managed=False, default='1'),
         'passive_host_checks_are_soft': BoolProp(managed=False, default='1'),
         'enable_predictive_host_dependency_checks': BoolProp(managed=False, default='1', class_inherit=[(Host, 'enable_predictive_dependency_checks')]),
@@ -204,7 +210,7 @@ class Config(Item):
         'use_embedded_perl_implicitly': BoolProp(managed=False, default='0'),
         'date_format':          StringProp(managed=False, default=None),
         'use_timezone':         StringProp(default='', class_inherit=[(Host, None), (Service, None), (Contact, None)]),
-        'illegal_object_name_chars': StringProp(default="""`~!$%^&*"|'<>?,()=""", class_inherit=[(Host, None), (Service, None), (Contact, None)]),
+        'illegal_object_name_chars': StringProp(default="""`~!$%^&*"|'<>?,()=""", class_inherit=[(Host, None), (Service, None), (Contact, None), (HostExtInfo, None)]),
         'illegal_macro_output_chars': StringProp(default='', class_inherit=[(Host, None), (Service, None), (Contact, None)]),
         'use_regexp_matching':  BoolProp(managed=False, default='0', help=' if you go some host or service definition like prod*, it will surely failed from now, sorry.'),
         'use_true_regexp_matching': BoolProp(managed=False, default=None),
@@ -222,7 +228,8 @@ class Config(Item):
         'idontcareaboutsecurity': BoolProp(default='0'),
         'flap_history': IntegerProp(default='20', class_inherit=[(Host, None), (Service, None)]),
         'max_plugins_output_length': IntegerProp(default='8192', class_inherit=[(Host, None), (Service, None)]),
-        
+        'no_event_handlers_during_downtimes': BoolProp(default='0', class_inherit=[(Host, None), (Service, None)]),
+
         # Interval between cleaning queues pass
         'cleaning_queues_interval' : IntegerProp(default='900'),
 
@@ -250,6 +257,13 @@ class Config(Item):
 
         ## Discovery part
         'strip_idname_fqdn' :    BoolProp(default='1'),
+        'runners_timeout'   :    IntegerProp(default='3600'),
+
+
+        ## WEBUI part
+        'webui_lock_file'   :    StringProp(default='webui.pid'),
+        'webui_port'        :    IntegerProp(default='8080'),
+        'webui_host'        :    StringProp(default='0.0.0.0'),
    }
 
     macros = {
@@ -296,12 +310,14 @@ class Config(Item):
         'realm':            (Realm, Realms, 'realms'),
         'module':           (Module, Modules, 'modules'),
         'resultmodulation': (Resultmodulation, Resultmodulations, 'resultmodulations'),
-        'criticitymodulation': (Criticitymodulation, Criticitymodulations, 'criticitymodulations'),
+        'businessimpactmodulation': (Businessimpactmodulation, Businessimpactmodulations, 'businessimpactmodulations'),
         'escalation':       (Escalation, Escalations, 'escalations'),
         'serviceescalation': (Serviceescalation, Serviceescalations, 'serviceescalations'),
         'hostescalation':   (Hostescalation, Hostescalations, 'hostescalations'),
         'discoveryrule':    (Discoveryrule, Discoveryrules, 'discoveryrules'),
         'discoveryrun':     (Discoveryrun, Discoveryruns, 'discoveryruns'),
+        'hostextinfo':      (HostExtInfo, HostsExtInfo, 'hostsextinfo'),
+        'serviceextinfo':   (ServiceExtInfo, ServicesExtInfo, 'servicesextinfo'),
     }
 
     #This tab is used to transform old parameters name into new ones
@@ -310,6 +326,8 @@ class Config(Item):
         'nagios_user':  'shinken_user',
         'nagios_group': 'shinken_group'
     }
+
+    read_config_silent = 0
 
     def __init__(self):
         self.params = {}
@@ -337,7 +355,7 @@ class Config(Item):
 
     def load_params(self, params):
         for elt in params:
-            elts = elt.split('=')
+            elts = elt.split('=', 1)
             if len(elts) == 1: #error, there is no = !
                 self.conf_is_correct = False
                 print "Error : the parameter %s is malformed! (no = sign)" % elts[0]
@@ -355,21 +373,22 @@ class Config(Item):
 
     def _cut_line(self, line):
         #punct = '"#$%&\'()*+/<=>?@[\\]^`{|}~'
-        tmp = re.split("[" + string.whitespace + "]+" , line)
+        tmp = re.split("[" + string.whitespace + "]+" , line, 1)
         r = [elt for elt in tmp if elt != '']
         return r
 
 
     def read_config(self, files):
         #just a first pass to get the cfg_file and all files in a buf
-        res = u''
+        res = StringIO()
 
         for file in files:
             #We add a \n (or \r\n) to be sure config files are separated
             #if the previous does not finish with a line return
-            res += os.linesep
-            res += '# IMPORTEDFROM=%s' % (file) + os.linesep
-            print "Opening configuration file", file
+            res.write(os.linesep)
+            res.write('# IMPORTEDFROM=%s' % (file) + os.linesep)
+            if self.read_config_silent == 0:
+               print "Opening configuration file ",file
             try:
                 # Open in Universal way for Windows, Mac, Linux
                 fd = open(file, 'rU')
@@ -387,11 +406,11 @@ class Config(Item):
                 # Should not be useful anymore with the Universal open
                 # if os.name != 'nt':
                 #  line = line.replace("\r\n", "\n")
-                res += line
+                res.write(line)
                 line = line[:-1]
                 line = line.strip()
                 if re.search("^cfg_file", line) or re.search("^resource_file", line):
-                    elts = line.split('=')
+                    elts = line.split('=', 1)
                     if os.path.isabs(elts[1]):
                         cfg_file_name = elts[1]
                     else:
@@ -400,17 +419,17 @@ class Config(Item):
                     try:
                         fd = open(cfg_file_name, 'rU')
                         logger.log("Processing object config file '%s'" % cfg_file_name)
-                        res += os.linesep + '# IMPORTEDFROM=%s' % (cfg_file_name) + os.linesep
-                        res += fd.read().decode('utf8', 'replace')
+                        res.write(os.linesep + '# IMPORTEDFROM=%s' % (cfg_file_name) + os.linesep)
+                        res.write(fd.read().decode('utf8', 'replace'))
                         #Be sure to add a line return so we won't mix files
-                        res += '\n'
+                        res.write('\n')
                         fd.close()
                     except IOError, exp:
                         logger.log("Error: Cannot open config file '%s' for reading: %s" % (cfg_file_name, exp))
                     #The configuration is invalid because we have a bad file!
                         self.conf_is_correct = False
                 elif re.search("^cfg_dir", line):
-                    elts = line.split('=')
+                    elts = line.split('=', 1)
                     if os.path.isabs(elts[1]):
                         cfg_dir_name = elts[1]
                     else:
@@ -425,15 +444,18 @@ class Config(Item):
                             if re.search("\.cfg$", file):
                                 logger.log("Processing object config file '%s'" % os.path.join(root, file))
                                 try:
-                                    res += os.linesep + '# IMPORTEDFROM=%s' % (os.path.join(root, file)) + os.linesep
+                                    res.write(os.linesep + '# IMPORTEDFROM=%s' % (os.path.join(root, file)) + os.linesep)
                                     fd = open(os.path.join(root, file), 'rU')
-                                    res += fd.read().decode('utf8', 'replace')
+                                    res.write(fd.read().decode('utf8', 'replace'))
                                     fd.close()
                                 except IOError, exp:
                                     logger.log("Error: Cannot open config file '%s' for reading: %s" % (os.path.join(root, file), exp))
                                     # The configuration is invalid
                                     # because we have a bad file!
                                     self.conf_is_correct = False
+        config = res.getvalue()
+        res.close()
+        return config
         return res
 #        self.read_config_buf(res)
 
@@ -445,7 +467,8 @@ class Config(Item):
                  'servicedependency', 'hostdependency', 'arbiter', 'scheduler',
                  'reactionner', 'broker', 'receiver', 'poller', 'realm', 'module', 
                  'resultmodulation', 'escalation', 'serviceescalation', 'hostescalation',
-                 'discoveryrun', 'discoveryrule', 'criticitymodulation']
+                 'discoveryrun', 'discoveryrule', 'businessimpactmodulation',
+                 'hostextinfo','serviceextinfo']
         objectscfg = {}
         for t in types:
             objectscfg[t] = []
@@ -460,7 +483,7 @@ class Config(Item):
             if line.startswith("# IMPORTEDFROM="):
                 filefrom = line.split('=')[1]
                 continue
-            line = line.split(';')[0]
+            line = line.split(';')[0].strip()
             #A backslash means, there is more to come
             if re.search("\\\s*$", line):
                 continuation_line = True
@@ -596,12 +619,14 @@ class Config(Item):
 
         #First fill default
         self.arbiterlinks.fill_default()
+        self.modules.fill_default()
 
         #print "****************** Pythonize ******************"
         self.arbiterlinks.pythonize()
 
         #print "****************** Linkify ******************"
         self.arbiterlinks.linkify(self.modules)
+        self.modules.linkify()
 
 
 
@@ -623,8 +648,10 @@ class Config(Item):
         # link hosts with timeperiods and commands
         self.hosts.linkify(self.timeperiods, self.commands, \
                                self.contacts, self.realms, \
-                               self.resultmodulations, self.criticitymodulations, \
+                               self.resultmodulations, self.businessimpactmodulations, \
                                self.escalations, self.hostgroups)
+
+        self.hostsextinfo.merge(self.hosts)
 
         # Do the simplify AFTER explode groups
         #print "Hostgroups"
@@ -635,8 +662,10 @@ class Config(Item):
         # link services with other objects
         self.services.linkify(self.hosts, self.commands, \
                                   self.timeperiods, self.contacts,\
-                                  self.resultmodulations, self.criticitymodulations, \
+                                  self.resultmodulations, self.businessimpactmodulations, \
                                   self.escalations, self.servicegroups)
+
+        self.servicesextinfo.merge(self.services)
 
         #print "Service groups"
         # link servicegroups members with services
@@ -658,17 +687,17 @@ class Config(Item):
         #link timeperiods with timeperiods (exclude part)
         self.timeperiods.linkify()
 
-        #print "Servicedependancy"
+        #print "Servicedependency"
         self.servicedependencies.linkify(self.hosts, self.services,
                                          self.timeperiods)
 
-        #print "Hostdependancy"
+        #print "Hostdependency"
         self.hostdependencies.linkify(self.hosts, self.timeperiods)
 
         #print "Resultmodulations"
         self.resultmodulations.linkify(self.timeperiods)
 
-        self.criticitymodulations.linkify(self.timeperiods)
+        self.businessimpactmodulations.linkify(self.timeperiods)
 
         #print "Escalations"
         self.escalations.linkify(self.timeperiods, self.contacts, \
@@ -716,6 +745,8 @@ class Config(Item):
         super(Config, self).old_properties_names_to_new()
         self.hosts.old_properties_names_to_new()
         self.services.old_properties_names_to_new()
+        self.notificationways.old_properties_names_to_new()
+        self.contacts.old_properties_names_to_new()
 
 
     #It's used to warn about useless parameter and print why it's not use.
@@ -743,7 +774,7 @@ class Config(Item):
         if len(unmanaged) != 0:
             print "\n"
             mailing_list_uri = "https://lists.sourceforge.net/lists/listinfo/shinken-devel"
-            text = 'Warning : the folowing parameter(s) are not curently managed.'
+            text = 'Warning : the following parameter(s) are not curently managed.'
             logger.log(text)
             for s in unmanaged:
                 logger.log(s)
@@ -779,7 +810,7 @@ class Config(Item):
 
         self.hostdependencies.explode(self.hostgroups)
 
-        #print "Servicedependancy"
+        #print "Servicedependency"
         self.servicedependencies.explode(self.hostgroups)
 
         #Serviceescalations hostescalations will create new escalations
@@ -804,9 +835,9 @@ class Config(Item):
 
     #Dependancies are importants for scheduling
     #This function create dependencies linked between elements.
-    def apply_dependancies(self):
-        self.hosts.apply_dependancies()
-        self.services.apply_dependancies()
+    def apply_dependencies(self):
+        self.hosts.apply_dependencies()
+        self.services.apply_dependencies()
 
 
     #Use to apply inheritance (template and implicit ones)
@@ -825,6 +856,10 @@ class Config(Item):
         self.hostdependencies.apply_inheritance()
         #Also timeperiods
         self.timeperiods.apply_inheritance()
+        #Also "Hostextinfo"
+        self.hostsextinfo.apply_inheritance()
+        #Also "Serviceextinfo"
+        self.servicesextinfo.apply_inheritance()
 
 
     #Use to apply implicit inheritance
@@ -845,7 +880,9 @@ class Config(Item):
         self.services.fill_default()
         self.servicegroups.fill_default()
         self.resultmodulations.fill_default()
-        self.criticitymodulations.fill_default()
+        self.businessimpactmodulations.fill_default()
+        self.hostsextinfo.fill_default()
+        self.servicesextinfo.fill_default()
 
         #Also fill default of host/servicedep objects
         self.servicedependencies.fill_default()
@@ -1148,6 +1185,8 @@ class Config(Item):
         self.servicedependencies.linkify_templates()
         self.hostdependencies.linkify_templates()
         self.timeperiods.linkify_templates()
+        self.hostsextinfo.linkify_templates()
+        self.servicesextinfo.linkify_templates()
 
 
 
@@ -1164,7 +1203,7 @@ class Config(Item):
         self.timeperiods.create_reversed_list()
 #        self.modules.create_reversed_list()
         self.resultmodulations.create_reversed_list()
-        self.criticitymodulations.create_reversed_list()
+        self.businessimpactmodulations.create_reversed_list()
         self.escalations.create_reversed_list()
         self.discoveryrules.create_reversed_list()
         self.discoveryruns.create_reversed_list()
@@ -1210,7 +1249,8 @@ class Config(Item):
             logger.log("check global parameters failed")
             
         for x in ('hosts', 'hostgroups', 'contacts', 'contactgroups', 'notificationways',
-                  'escalations', 'services', 'servicegroups', 'timeperiods', 'commands'):
+                  'escalations', 'services', 'servicegroups', 'timeperiods', 'commands',
+                  'hostsextinfo','servicesextinfo'):
             logger.log('Checking %s...' % (x))
             cur = getattr(self, x)
             if not cur.is_correct():
@@ -1225,7 +1265,7 @@ class Config(Item):
         
         for x in ( 'servicedependencies', 'hostdependencies', 'arbiterlinks', 'schedulerlinks',
                    'reactionners', 'pollers', 'brokers', 'receivers', 'resultmodulations',
-                   'discoveryrules', 'discoveryruns', 'criticitymodulations'):
+                   'discoveryrules', 'discoveryruns', 'businessimpactmodulations'):
             try: cur = getattr(self, x)
             except: continue
             logger.log('Checking %s...' % (x))
@@ -1259,7 +1299,7 @@ class Config(Item):
         self.services.pythonize()
         self.servicedependencies.pythonize()
         self.resultmodulations.pythonize()
-        self.criticitymodulations.pythonize()
+        self.businessimpactmodulations.pythonize()
         self.escalations.pythonize()
         self.discoveryrules.pythonize()
         self.discoveryruns.pythonize()
@@ -1279,12 +1319,12 @@ class Config(Item):
     def explode_global_conf(self):
         clss = [Service, Host, Contact, SchedulerLink,
                 PollerLink, ReactionnerLink, BrokerLink,
-                ReceiverLink, ArbiterLink]
+                ReceiverLink, ArbiterLink, HostExtInfo]
         for cls in clss:
             cls.load_global_conf(self)
 
 
-    #Clean useless elements like templates because they are not needed anymore
+    # Clean useless elements like templates because they are not needed anymore
     def remove_templates(self):
         self.hosts.remove_templates()
         self.contacts.remove_templates()
@@ -1471,7 +1511,7 @@ class Config(Item):
 
     # Use the self.conf and make nb_parts new confs.
     # nbparts is equal to the number of schedulerlink
-    # New confs are independant whith checks. The only communication
+    # New confs are independent whith checks. The only communication
     # That can be need is macro in commands
     def cut_into_parts(self):
         #print "Scheduler configurated :", self.schedulerlinks

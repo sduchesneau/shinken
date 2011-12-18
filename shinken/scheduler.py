@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#Copyright (C) 2009-2010 :
+#Copyright (C) 2009-2011 :
 #    Gabes Jean, naparuba@gmail.com
 #    Gerhard Lausser, Gerhard.Lausser@consol.de
 #    Gregory Starck, g.starck@gmail.com
@@ -26,6 +26,7 @@ import os
 import traceback
 import cStringIO
 import sys
+import socket
 
 try:
     import shinken.pyro_wrapper as pyro
@@ -43,8 +44,14 @@ from shinken.contactdowntime import ContactDowntime
 from shinken.comment import Comment
 from shinken.acknowledge import Acknowledge
 from shinken.log import logger
-from shinken.util import nighty_five_percent
+from shinken.util import nighty_five_percent, safe_print
 from shinken.load import Load
+
+# Pack of common Pyro exceptions
+Pyro_exp_pack = (Pyro.errors.ProtocolError, Pyro.errors.URIError, \
+                    Pyro.errors.CommunicationError, \
+                    Pyro.errors.DaemonError)
+
 
 class Scheduler:
     def __init__(self, scheduler_daemon):
@@ -64,7 +71,7 @@ class Scheduler:
         self.recurrent_works = {
             0 : ('update_downtimes_and_comments', self.update_downtimes_and_comments, 1),
             1 : ('schedule', self.schedule, 1), # just schedule
-            2 : ('consume_results', self.consume_results , 1), # incorpore checks and dependancies
+            2 : ('consume_results', self.consume_results , 1), # incorpore checks and dependencies
             3 : ('get_new_actions', self.get_new_actions, 1), # now get the news actions (checks, notif) raised
             4 : ('get_new_broks', self.get_new_broks, 1), # and broks
             5 : ('delete_zombie_checks', self.delete_zombie_checks, 1),
@@ -84,8 +91,10 @@ class Scheduler:
             # clean some times possibel overriden Queues, to do not explode in memory usage
             # every 1/4 of hour
             14 : ('clean_queues', self.clean_queues, 1),
-            # Look for new criticity change by modulation every minute
-            15 : ('update_criticities', self.update_criticities, 60),
+            # Look for new business_impact change by modulation every minute
+            15 : ('update_business_values', self.update_business_values, 60),
+            # Reset the topology change flag if need
+            16 : ('reset_topology_change_flag', self.reset_topology_change_flag, 1),
         }
 
         # stats part
@@ -187,7 +196,7 @@ class Scheduler:
 
     # We've got activity in the fifo, we get and run commands
     def run_external_command(self, command):
-        print "scheduler resolves command", command
+        safe_print("scheduler resolves command", command)
         ext_cmd = ExternalCommand(command)
         self.external_command.resolve_command(ext_cmd)
 
@@ -301,10 +310,10 @@ class Scheduler:
                 elt = c.ref
                 # First remove the link in host/service
                 elt.remove_in_progress_check(c)
-                # Then in dependant checks (I depend on, or check
+                # Then in dependent checks (I depend on, or check
                 # depend on me)
-                for dependant_checks in c.depend_on_me:
-                    dependant_checks.depend_on.remove(c.id)
+                for dependent_checks in c.depend_on_me:
+                    dependent_checks.depend_on.remove(c.id)
                 for c_temp in c.depend_on:
                     c_temp.depen_on_me.remove(c)
                 del self.checks[i] # Final Bye bye ...
@@ -378,19 +387,19 @@ class Scheduler:
             self.comments[c_id].ref.del_comment(c_id)
             del self.comments[c_id]
 
-    # We update all criticity for looking at new modulation
+    # We update all business_impact for looking at new modulation
     # start for impacts, and so update broks status and
     # problems value too
-    def update_criticities(self):
+    def update_business_values(self):
         for t in [self.hosts, self.services]:
             # We first update impacts and classic elements
             for i in [i for i in t if not i.is_problem]:
-                was = i.criticity
-                i.update_criticity_value()
-                new = i.criticity
-                # Ok, the criticity change, we can update the broks
+                was = i.business_impact
+                i.update_business_impact_value()
+                new = i.business_impact
+                # Ok, the business_impact change, we can update the broks
                 if new != was:
-                    #print "The elements", i.get_name(), "change it's criticity value"
+                    #print "The elements", i.get_name(), "change it's business_impact value"
                     self.get_and_register_status_brok(i)
                     
         # When all impacts and classic elements are updated,
@@ -399,13 +408,13 @@ class Scheduler:
         for t in [self.hosts, self.services]:
             # We first update impacts and classic elements
             for i in [i for i in t if i.is_problem]:
-                was = i.criticity
-                i.update_criticity_value()
-                new = i.criticity
-                # Maybe one of the impacts change it's criticity to a high value
+                was = i.business_impact
+                i.update_business_impact_value()
+                new = i.business_impact
+                # Maybe one of the impacts change it's business_impact to a high value
                 # and so ask for the problem to raise too
                 if new != was:
-                    #print "The elements", i.get_name(), "change it's criticity value from", was, "to", new 
+                    #print "The elements", i.get_name(), "change it's business_impact value from", was, "to", new 
                     self.get_and_register_status_brok(i)
 
 
@@ -472,6 +481,7 @@ class Scheduler:
                                 new_c = c.copy_shell()
                                 res.append(new_c)
 
+
                         # If we have notification_interval then schedule the next notification (problems only)
                         if a.type == 'PROBLEM':
                             # Update the ref notif number after raise the one of the notification
@@ -518,19 +528,30 @@ class Scheduler:
                     # sets the status to zombie, so we need to save it here.
                     timeout = True
                     execution_time = c.execution_time
+
+                # Add protection for strange charset
+                if isinstance(c.output, str):
+                    c.output = c.output.decode('utf8', 'ignore')
+
                 self.actions[c.id].get_return_from(c)
                 item = self.actions[c.id].ref
                 item.remove_in_progress_notification(c)
                 self.actions[c.id].status = 'zombie'
                 item.last_notification = c.check_time
-                #If we' ve got a problem with the notification, raise a Warning log
+
+                # And we ask the item to update it's state
+                self.get_and_register_status_brok(item)
+
+                # If we' ve got a problem with the notification, raise a Warning log
                 if timeout:
                     logger.log("Warning: Contact %s %s notification command '%s ' timed out after %d seconds" % (self.actions[c.id].contact.contact_name, self.actions[c.id].ref.__class__.my_type, self.actions[c.id].command, int(execution_time)))
                 elif c.exit_status != 0:
                     logger.log("Warning : the notification command '%s' raised an error (exit code=%d) : '%s'" % (c.command, c.exit_status, c.output))
             except KeyError , exp: #bad number for notif, not so terrible
+                #print exp
                 pass
-            except AttributeError: # bad object, drop it
+            except AttributeError, exp: # bad object, drop it
+                #print exp
                 pass
 
 
@@ -557,7 +578,7 @@ class Scheduler:
 
 
 
-    # Get teh good tabs for links by the kind. If unknown, return None
+    # Get the good tabs for links by the kind. If unknown, return None
     def get_links_from_type(self, type):
         t = { 'poller' : self.pollers, 'reactionner' : self.reactionners }
         if type in t :
@@ -577,7 +598,7 @@ class Scheduler:
     # initialise or re-initialise connection with a poller
     # or a reactionner
     def pynag_con_init(self, id, type='poller'):
-        # Get teh good links tab for looping..
+        # Get the good links tab for looping..
         links = self.get_links_from_type(type)
         if links is None:
             logger.log('DBG: Type unknown for connection! %s' % type)
@@ -598,16 +619,29 @@ class Scheduler:
 
         print "Init connection with", links[id]['uri']
 
+
         uri = links[id]['uri']
-        links[id]['con'] = Pyro.core.getProxyForURI(uri)
-        con = links[id]['con']
+        try:
+            # But the multiprocessing module is not copatible with it!
+            # so we must disable it imediatly after
+            socket.setdefaulttimeout(3)
+            links[id]['con'] = Pyro.core.getProxyForURI(uri)
+            con = links[id]['con']
+            socket.setdefaulttimeout(None)
+        except Pyro_exp_pack , exp:
+            # But the multiprocessing module is not copatible with it!
+            # so we must disable it imadiatly after
+            socket.setdefaulttimeout(None)
+            logger.log("[] Connection problem to the %s %s : %s" % (type, links[id]['name'], str(exp)))
+            links[id]['con'] = None
+            return
 
         try:
             # intial ping must be quick
             pyro.set_timeout(con, 5)
             con.ping()
         except Pyro.errors.ProtocolError, exp:
-            logger.log("[] Connexion problem to the %s %s : %s" % (type, links[id]['name'], str(exp)))
+            logger.log("[] Connection problem to the %s %s : %s" % (type, links[id]['name'], str(exp)))
             links[id]['con'] = None
             return
         except Pyro.errors.NamingError, exp:
@@ -624,7 +658,7 @@ class Scheduler:
             links[id]['con'] = None
             return
 
-        logger.log("[] Connexion OK to the %s %s" % (type, links[id]['name']))
+        logger.log("[] Connection OK to the %s %s" % (type, links[id]['name']))
 
 
     # We should push actions to our passives satellites
@@ -644,7 +678,7 @@ class Scheduler:
                     con.push_actions(lst, self.instance_id)
                     self.nb_checks_send += len(lst)
                 except Pyro.errors.ProtocolError, exp:
-                    logger.log("[] Connexion problem to the %s %s : %s" % (type, p['name'], str(exp)))
+                    logger.log("[] Connection problem to the %s %s : %s" % (type, p['name'], str(exp)))
                     p['con'] = None
                     return
                 except Pyro.errors.NamingError, exp:
@@ -681,7 +715,7 @@ class Scheduler:
                     con.push_actions(lst, self.instance_id)
                     self.nb_checks_send += len(lst)
                 except Pyro.errors.ProtocolError, exp:
-                    logger.log("[] Connexion problem to the %s %s : %s" % (type, p['name'], str(exp)))
+                    logger.log("[] Connection problem to the %s %s : %s" % (type, p['name'], str(exp)))
                     p['con'] = None
                     return
                 except Pyro.errors.NamingError, exp:
@@ -721,7 +755,7 @@ class Scheduler:
                     print "Received %d passive results" % nb_received
                     self.waiting_results.extend(results)
                 except Pyro.errors.ProtocolError, exp:
-                    logger.log("[] Connexion problem to the %s %s : %s" % (type, p['name'], str(exp)))
+                    logger.log("[] Connection problem to the %s %s : %s" % (type, p['name'], str(exp)))
                     p['con'] = None
                     return
                 except Pyro.errors.NamingError, exp:
@@ -757,7 +791,7 @@ class Scheduler:
                     print "Received %d passive results" % nb_received
                     self.waiting_results.extend(results)
                 except Pyro.errors.ProtocolError, exp:
-                    logger.log("[] Connexion problem to the %s %s : %s" % (type, p['name'], str(exp)))
+                    logger.log("[] Connection problem to the %s %s : %s" % (type, p['name'], str(exp)))
                     p['con'] = None
                     return
                 except Pyro.errors.NamingError, exp:
@@ -801,6 +835,16 @@ class Scheduler:
         # They are gone, we keep none!
         self.broks = {}
         return res
+
+    # An element can have its topology changed by an external command
+    # if so a brok will be generated with this flag. Now need to reset all of
+    # them.
+    def reset_topology_change_flag(self):
+        for i in self.hosts:
+            i.topology_change = False
+        for i in  self.services:
+            i.topology_change = False
+
 
 
     # Update the retention file and give it all of ours data in
@@ -977,7 +1021,7 @@ class Scheduler:
 
     # Fill the self.broks with broks of self (process id, and co)
     # broks of service and hosts (initial status)
-    def fill_initial_broks(self):
+    def fill_initial_broks(self, with_logs=False):
         # First a Brok for delete all from my instance_id
         b = Brok('clean_all_my_instance_id', {'instance_id' : self.instance_id})
         self.add(b)
@@ -998,11 +1042,13 @@ class Scheduler:
                 b = i.get_initial_status_brok()
                 self.add(b)
 
-        # Ask for INITIAL logs for services and hosts
-        for i in self.hosts:
-            i.raise_initial_state()
-        for i in self.services:
-            i.raise_initial_state()
+        # Only raise the all logs at the scehduler startup
+        if with_logs:
+            # Ask for INITIAL logs for services and hosts
+            for i in self.hosts:
+                i.raise_initial_state()
+            for i in self.services:
+                i.raise_initial_state()
 
         # Add a brok to say that we finished all initial_pass
         b = Brok('initial_broks_done', {'instance_id' : self.instance_id})
@@ -1085,9 +1131,9 @@ class Scheduler:
         # All 'finished' checks (no more dep) raise checks they depends on
         for c in self.checks.values():
             if c.status == 'havetoresolvedep':
-                for dependant_checks in c.depend_on_me:
-                    # Ok, now dependant will no more wait c
-                    dependant_checks.depend_on.remove(c.id)
+                for dependent_checks in c.depend_on_me:
+                    # Ok, now dependent will no more wait c
+                    dependent_checks.depend_on.remove(c.id)
                 # REMOVE OLD DEP CHECL -> zombie
                 c.status = 'zombie'
 
@@ -1248,6 +1294,7 @@ class Scheduler:
                 worker_names[c.worker] += 1
         for a in self.actions.values():
             if a.status == 'inpoller' and a.t_to_go < now - 300:
+                
                 a.status = 'scheduled'
                 if a.worker not in worker_names:
                     worker_names[a.worker] = 1
@@ -1264,7 +1311,7 @@ class Scheduler:
         self.retention_load()
 
         # Ok, now all is initilised, we can make the inital broks
-        self.fill_initial_broks()
+        self.fill_initial_broks(with_logs=True)
 
         logger.log("[%s] First scheduling launched" % self.instance_name)
         self.schedule()

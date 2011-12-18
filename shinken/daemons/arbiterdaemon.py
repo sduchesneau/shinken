@@ -53,6 +53,9 @@ class IForArbiter(Interface):
         super(IForArbiter, self).put_conf(conf)
         self.app.must_run = False
 
+    def get_config(self):
+        return self.app.conf
+
     # The master arbiter asks me not to run!
     def do_not_run(self):
         # If i'm the master, then F**K YOU!
@@ -96,6 +99,16 @@ class IForArbiter(Interface):
     # Dummy call. We are a master, we managed what we want
     def what_i_managed(self):
         return []
+
+
+    def get_all_states(self):
+        res = {'arbiter' : self.app.conf.arbiterlinks,
+               'scheduler' : self.app.conf.schedulerlinks,
+               'poller' : self.app.conf.pollers,
+               'reactionner' : self.app.conf.reactionners,
+               'receiver' : self.app.conf.receivers,
+               'broker' : self.app.conf.brokers}
+        return res
 
 
 # Main Arbiter Class
@@ -153,24 +166,18 @@ class Arbiter(Daemon):
                     self.broks.clear()
 
 
-    # We must take external_commands from all brokers
-    def get_external_commands_from_brokers(self):
-        for brk in self.conf.brokers:
-            # Get only if alive of course
-            if brk.alive:
-                new_cmds = brk.get_external_commands()
-                for new_cmd in new_cmds:
-                    self.external_commands.append(new_cmd)
-
-
-    # We must take external_commands from all brokers
-    def get_external_commands_from_receivers(self):
-        for rec in self.conf.receivers:
-            # Get only if alive of course
-            if rec.alive:
-                new_cmds = rec.get_external_commands()
-                for new_cmd in new_cmds:
-                    self.external_commands.append(new_cmd)
+    # We must take external_commands from all satellites
+    # like brokers, pollers, reactionners or receivers
+    def get_external_commands_from_satellites(self):
+        sat_lists = [self.conf.brokers, self.conf.receivers,
+                     self.conf.pollers, self.conf.reactionners]
+        for lst in sat_lists:
+            for sat in lst:
+                # Get only if alive of course
+                if sat.alive:
+                    new_cmds = sat.get_external_commands()
+                    for new_cmd in new_cmds:
+                        self.external_commands.append(new_cmd)
 
 
     # Our links to satellites can raise broks. We must send them
@@ -215,6 +222,9 @@ class Arbiter(Daemon):
         buf = self.conf.read_config(self.config_files)
         raw_objects = self.conf.read_config_buf(buf)
 
+        print "Opening local log file"
+
+
         # First we need to get arbiters and modules first
         # so we can ask them some objects too
         self.conf.create_objects_for_type(raw_objects, 'arbiter')
@@ -239,11 +249,11 @@ class Arbiter(Daemon):
                 arb.need_conf = True
 
         if not self.me:
-            sys.exit("Error: I cannot find my own Arbiter object, I bail out. "
-                     "To solve it, please change the host_name parameter in "
-                     "the object Arbiter in the file shinken-specific.cfg. "
-                     "With the value %s " % socket.gethostname(),
-                     "Thanks.")
+            sys.exit("Error: I cannot find my own Arbiter object, I bail out. \
+                     To solve it, please change the host_name parameter in \
+                     the object Arbiter in the file shinken-specific.cfg. \
+                     With the value %s \
+                     Thanks." % socket.gethostname())
 
         logger.log("My own modules : " + ','.join([m.get_name() for m in self.me.modules]))
 
@@ -312,6 +322,10 @@ class Arbiter(Daemon):
         
         # Remove templates from config
         self.conf.remove_templates()
+
+        # We removed templates, and so we must recompute the
+        # search lists
+        self.conf.create_reversed_list()
         
         # Pythonize values
         self.conf.pythonize()
@@ -319,8 +333,8 @@ class Arbiter(Daemon):
         # Linkify objects each others
         self.conf.linkify()
 
-        # applying dependancies
-        self.conf.apply_dependancies()
+        # applying dependencies
+        self.conf.apply_dependencies()
 
         # Hacking some global parameter inherited from Nagios to create
         # on the fly some Broker modules like for status.dat parameters
@@ -337,7 +351,7 @@ class Arbiter(Daemon):
         # set ourown timezone and propagate it to other satellites
         self.conf.propagate_timezone_option()
 
-        # Look for business rules, and create teh dep trees
+        # Look for business rules, and create the dep tree
         self.conf.create_business_rules()
         # And link them
         self.conf.create_business_rules_dependencies()
@@ -383,12 +397,19 @@ class Arbiter(Daemon):
 
         # Ok, here we must check if we go on or not.
         # TODO : check OK or not
+        self.use_local_log = self.conf.use_local_log
+        self.local_log = self.conf.local_log
         self.pidfile = os.path.abspath(self.conf.lock_file)
         self.idontcareaboutsecurity = self.conf.idontcareaboutsecurity
         self.user = self.conf.shinken_user
         self.group = self.conf.shinken_group
         
-        self.workdir = os.path.abspath(os.path.dirname(self.pidfile))
+        # If the user set a workdir, let use it. If not, use the
+        # pidfile directory
+        if self.conf.workdir == '':
+            self.workdir = os.path.abspath(os.path.dirname(self.pidfile))
+        else:
+            self.workdir = self.conf.workdir
         #print "DBG curpath=", os.getcwd()
         #print "DBG pidfile=", self.pidfile
         #print "DBG workdir=", self.workdir
@@ -427,8 +448,8 @@ class Arbiter(Daemon):
             # ends up here and must be handled.
             sys.exit(exp.code)
         except Exception, exp:
-            logger.log("CRITICAL ERROR : I got an non recovarable error. I must exit")
-            logger.log("You can log a bug ticket at https://sourceforge.net/apps/trac/shinken/newticket for geting help")
+            logger.log("CRITICAL ERROR: I got an unrecoverable error. I have to exit")
+            logger.log("You can log a bug ticket at https://sourceforge.net/apps/trac/shinken/newticket to get help")
             logger.log("Back trace of it: %s" % (traceback.format_exc()))
             raise
 
@@ -482,9 +503,17 @@ class Arbiter(Daemon):
 
     # We wait (block) for arbiter to send us something
     def wait_for_master_death(self):
-        print "Waiting for master death"
+        logger.log("Waiting for master death")
         timeout = 1.0
         self.last_master_speack = time.time()
+
+        # Look for the master timeout
+        master_timeout = 300
+        for arb in self.conf.arbiterlinks:
+            if not arb.spare:
+                master_timeout = arb.check_interval * arb.max_check_attempts
+        logger.log("I'll wait master for %d seconds" % master_timeout)
+
         
         while not self.interrupted:
             elapsed, _, tcdiff = self.handleRequests(timeout)
@@ -505,8 +534,8 @@ class Arbiter(Daemon):
 
             # Now check if master is dead or not
             now = time.time()
-            if now - self.last_master_speack > 5:
-                print "Master is dead!!!"
+            if now - self.last_master_speack > master_timeout:
+                logger.log("Master is dead!!!")
                 self.must_run = True
                 break
 
@@ -591,8 +620,8 @@ class Arbiter(Daemon):
             # One broker is responsible for our broks,
             # we must give him our broks
             self.push_broks_to_broker()
-            self.get_external_commands_from_brokers()
-            self.get_external_commands_from_receivers()
+            self.get_external_commands_from_satellites()
+            #self.get_external_commands_from_receivers()
             # send_conf_to_schedulers()
             
             if self.nb_broks_send != 0:

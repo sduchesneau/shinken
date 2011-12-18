@@ -24,7 +24,7 @@
 import os
 import time
 
-from shinken.util import to_int, to_bool
+from shinken.util import to_int, to_bool, safe_print
 from shinken.downtime import Downtime
 from shinken.contactdowntime import ContactDowntime
 from shinken.comment import Comment
@@ -74,7 +74,9 @@ class ExternalCommandManager:
         'DELAY_HOST_NOTIFICATION' : {'global' : False, 'args' : ['host', 'to_int']},
         'DELAY_SVC_NOTIFICATION' : {'global' : False, 'args' : ['service', 'to_int']},
         'DEL_ALL_HOST_COMMENTS' : {'global' : False, 'args' : ['host']},
+        'DEL_ALL_HOST_DOWNTIMES' : {'global' : False, 'args' : ['host']},
         'DEL_ALL_SVC_COMMENTS' : {'global' : False, 'args' : ['service']},
+        'DEL_ALL_SVC_DOWNTIMES' : {'global' : False, 'args' : ['service']},
         'DEL_CONTACT_DOWNTIME' : {'global' : True, 'args' : ['to_int']},
         'DEL_HOST_COMMENT' : {'global' : True, 'args' : ['to_int']},
         'DEL_HOST_DOWNTIME' : {'global' : True, 'args' : ['to_int']},
@@ -275,13 +277,18 @@ class ExternalCommandManager:
 
 
     def resolve_command(self, excmd):
-        command = excmd.cmd_line
+        # Maybe the command is invalid. Bailout
+        try:
+            command = excmd.cmd_line
+        except AttributeError, exp:
+            print "DBG: resolve_command:: error with command", excmd, exp
+            return
 
         # Strip and get utf8 only strings
         command = command.strip()
 
         #Only log if we are in the Arbiter
-        if self.mode == 'dispatcher':
+        if self.mode == 'dispatcher' and self.conf.log_external_commands:
             logger.log('EXTERNAL COMMAND: '+command.rstrip())
         self.get_command_and_args(command)
 
@@ -290,17 +297,20 @@ class ExternalCommandManager:
     #by the hostname which scheduler have the host. Then send
     #it the command
     def search_host_and_dispatch(self, host_name, command):
-        print "Calling search_host_and_dispatch", 'for', host_name
+        safe_print("Calling search_host_and_dispatch", 'for', host_name)
+        host_found = False
         for cfg in self.confs.values():
             if cfg.hosts.find_by_name(host_name) is not None:
-                print "Host", host_name, "found in a configuration"
+                safe_print("Host", host_name, "found in a configuration")
                 if cfg.is_assigned :
+                    host_found = True
                     sched = cfg.assigned_to
-                    print "Sending command to the scheduler", sched.get_name()
+                    safe_print("Sending command to the scheduler", sched.get_name())
                     sched.run_external_command(command)
+                    break
                 else:
                     print "Problem: a configuration is found, but is not assigned!"
-            else:
+        if not host_found:
                 logger.log("Warning:  Passive check result was received for host '%s', but the host could not be found!" % host_name)
                 #print "Sorry but the host", host_name, "was not found"
 
@@ -308,14 +318,14 @@ class ExternalCommandManager:
     #The command is global, so sent it to every schedulers
     def dispatch_global_command(self, command):
         for sched in self.conf.schedulerlinks:
-            print "Sending a command", command, 'to scheduler', sched
+            safe_print("Sending a command", command, 'to scheduler', sched)
             if sched.alive:
                 sched.run_external_command(command)
 
 
     #We need to get the first part, the command name
     def get_command_and_args(self, command):
-        print "Trying to resolve", command
+        safe_print("Trying to resolve", command)
         command = command.rstrip()
         elts = command.split(';') # danger!!! passive checkresults with perfdata
         part1 = elts[0]
@@ -323,11 +333,11 @@ class ExternalCommandManager:
         elts2 = part1.split(' ')
         print "Elts2:", elts2
         if len(elts2) != 2:
-            print "Malformed command", command
+            safe_print("Malformed command", command)
             return None
         c_name = elts2[1]
 
-        print "Get command name", c_name
+        safe_print("Get command name", c_name)
         if c_name not in ExternalCommandManager.commands:
             print "This command is not recognized, sorry"
             return None
@@ -364,16 +374,16 @@ class ExternalCommandManager:
         tmp_host = ''
         try:
             for elt in elts[1:]:
-                print "Searching for a new arg:", elt, i
+                safe_print("Searching for a new arg:", elt, i)
                 val = elt.strip()
                 if val[-1] == '\n':
                     val = val[:-1]
 
-                print "For command arg", val
+                safe_print("For command arg", val)
 
                 if not in_service:
                     type_searched = entry['args'][i-1]
-                    print "Search for a arg", type_searched
+                    safe_print("Search for a arg", type_searched)
 
                     if type_searched == 'host':
                         if self.mode == 'dispatcher':
@@ -429,7 +439,7 @@ class ExternalCommandManager:
                     elif type_searched == 'service':
                         in_service = True
                         tmp_host = elt.strip()
-                        print "TMP HOST", tmp_host
+                        safe_print("TMP HOST", tmp_host)
                         if tmp_host[-1] == '\n':
                             tmp_host = tmp_host[:-1]
                             #If
@@ -443,7 +453,7 @@ class ExternalCommandManager:
                     srv_name = elt
                     if srv_name[-1] == '\n':
                         srv_name = srv_name[:-1]
-                    print "Got service full", tmp_host, srv_name
+                    safe_print("Got service full", tmp_host, srv_name)
                     s = self.services.find_srv_by_name_and_hostname(tmp_host, srv_name)
                     if s is not None:
                         args.append(s)
@@ -451,15 +461,15 @@ class ExternalCommandManager:
                         logger.log("Warning: a command was received for service '%s' on host '%s', but the service could not be found!" % (srv_name, tmp_host))
 
         except IndexError:
-            print "Sorry, the arguments are not corrects"
+            safe_print("Sorry, the arguments are not corrects")
             return None
-        print 'Finally got ARGS:', args
+        safe_print('Finally got ARGS:', args)
         if len(args) == len(entry['args']):
-            print "OK, we can call the command", c_name, "with", args
+            safe_print("OK, we can call the command", c_name, "with", args)
             f = getattr(self, c_name)
             apply(f, args)
         else:
-            print "Sorry, the arguments are not corrects", args
+            safe_print("Sorry, the arguments are not corrects", args)
 
 
 
@@ -614,10 +624,20 @@ class ExternalCommandManager:
         for c in host.comments:
             self.DEL_HOST_COMMENT(c.id)
 
+    #DEL_ALL_HOST_COMMENTS;<host_name>
+    def DEL_ALL_HOST_DOWNTIMES(self, host):
+        for dt in host.downtimes:
+            self.DEL_HOST_DOWNTIME(dt.id)
+
     #DEL_ALL_SVC_COMMENTS;<host_name>;<service_description>
     def DEL_ALL_SVC_COMMENTS(self, service):
         for c in service.comments:
             self.DEL_SVC_COMMENT(c.id)
+
+    #DEL_ALL_SVC_COMMENTS;<host_name>;<service_description>
+    def DEL_ALL_SVC_DOWNTIMES(self, service):
+        for dt in service.downtimes:
+            self.DEL_SVC_DOWNTIME(dt.id)
 
     #DEL_CONTACT_DOWNTIME;<downtime_id>
     def DEL_CONTACT_DOWNTIME(self, downtime_id):
@@ -726,7 +746,7 @@ class ExternalCommandManager:
 
     #DISABLE_HOST_CHECK;<host_name>
     def DISABLE_HOST_CHECK(self, host):
-        host.active_checks_enabled = False
+        host.disable_active_checks()
         self.sched.get_and_register_status_brok(host)
 
     #DISABLE_HOST_EVENT_HANDLER;<host_name>
@@ -826,7 +846,7 @@ class ExternalCommandManager:
 
     #DISABLE_SVC_CHECK;<host_name>;<service_description>
     def DISABLE_SVC_CHECK(self, service):
-        service.active_checks_enabled = False
+        service.disable_active_checks()
         self.sched.get_and_register_status_brok(service)
 
     #DISABLE_SVC_EVENT_HANDLER;<host_name>;<service_description>
@@ -930,7 +950,7 @@ class ExternalCommandManager:
 
     #ENABLE_HOST_EVENT_HANDLER;<host_name>
     def ENABLE_HOST_EVENT_HANDLER(self, host):
-        host.enable_event_handlers = True
+        host.event_handler_enabled = True
         self.sched.get_and_register_status_brok(host)
 
     #ENABLE_HOST_FLAP_DETECTION;<host_name>
@@ -1325,8 +1345,13 @@ class ExternalCommandManager:
     def ADD_SIMPLE_HOST_DEPENDENCY(self, son, father):
         if not son.is_linked_with_host(father):
             print "Doing simple link between", son.get_name(), 'and', father.get_name()
+            # Flag them so the modules will know that a topology change
+            # happened
+            son.topology_change = True
+            father.topology_change = True
+            # Now do the work
             # Add a dep link between the son and the father
-            son.add_host_act_dependancy(father, ['w', 'u', 'd'], None, True)
+            son.add_host_act_dependency(father, ['w', 'u', 'd'], None, True)
             self.sched.get_and_register_status_brok(son)
             self.sched.get_and_register_status_brok(father)
         
@@ -1335,7 +1360,12 @@ class ExternalCommandManager:
     def DEL_HOST_DEPENDENCY(self, son, father):
         if son.is_linked_with_host(father):
             print "removing simple link between", son.get_name(), 'and', father.get_name()
-            son.del_host_act_dependancy(father)
+            # Flag them so the modules will know that a topology change
+            # happened
+            son.topology_change = True
+            father.topology_change = True
+            # Now do the work
+            son.del_host_act_dependency(father)
             self.sched.get_and_register_status_brok(son)
             self.sched.get_and_register_status_brok(father)
 
