@@ -73,16 +73,16 @@ class Npcd_broker(BaseModule):
 
         if self.config_file and not self.process_config_file():
             print "npcdmod: An error occurred process your config file. Check your perfdata_file or perfdata_spool_dir"
-            raise
+            raise Exception('npcdmod: An error occurred process your config file. Check your perfdata_file or perfdata_spool_dir')
         if not self.perfdata_spool_dir and not self.perfdata_file:
             print "npcdmod: An error occurred while attempting to process module arguments"
-            raise
+            raise Exception('npcdmod: An error occurred while attempting to process module arguments')
         try:
             # We open the file with line buffering, so we can better watch it with tail -f
             self.logfile = codecs.open(self.perfdata_file, 'a','utf-8','replace', 1)
         except:
             print "could not open file %s" % self.perfdata_file
-            raise
+            raise Exception('could not open file %s" % self.perfdata_file')
         # use so we do nto ask a reinit ofan instance too quickly
         self.last_need_data_send = time.time()
 
@@ -214,8 +214,9 @@ class Npcd_broker(BaseModule):
         self.rotate()
         last_rotated = time.time()
         while not self.interrupted:
-            b = self.to_q.get() # can block here :)
-            self.manage_brok(b)
+            l = self.to_q.get() # can block here :)
+            for b in l:
+                self.manage_brok(b)
             if time.time() - last_rotated > self.sleep_time:
                 self.rotate()
                 last_rotated = time.time()

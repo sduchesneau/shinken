@@ -17,6 +17,7 @@
 #along with Shinken.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import sys
 try:
     import json
 except ImportError:
@@ -79,7 +80,12 @@ class LiveStatusResponse:
                         if isinstance(x, list):
                             l.append(self.separators[2].join(str(y) for y in x))
                         else:
-                            l.append(str(x))
+                            try:
+                                l.append(str(x))
+                            except UnicodeEncodeError:
+                                l.append(x.encode("utf-8", "replace"))
+                            except Exception:
+                                l.append("")
                     lines.append(self.separators[1].join(l))
             else:
                 for object in result:
@@ -89,7 +95,12 @@ class LiveStatusResponse:
                         if isinstance(x, list):
                             l.append(self.separators[2].join(str(y) for y in x))
                         else:
-                            l.append(str(x))
+                            try:
+                                l.append(str(x))
+                            except UnicodeEncodeError:
+                                l.append(x.encode("utf-8", "replace"))
+                            except Exception:
+                                l.append("")
                     lines.append(self.separators[1].join(l))
             if len(lines) > 0:
                 if self.columnheaders != 'off' or len(columns) == 0:

@@ -34,42 +34,6 @@ from livestatus_request import LiveStatusRequest
 
 
 
-def join_with_separators(prop, ref, request, *args):
-    if request.response.outputformat == 'csv':
-        return request.response.separators[3].join([str(arg) for arg in args])
-    elif request.response.outputformat == 'json' or request.response.outputformat == 'python':
-        return args
-    else:
-        return None
-    pass
-
-
-
-
-def worst_host_state(state_1, state_2):
-    """Return the worst of two host states."""
-    #lambda x: reduce(lambda g, c: c if g == 0 else (c if c == 1 else g), (y.state_id for y in x), 0),
-    if state_2 == 0:
-        return state_1
-    if state_1 == 1:
-        return state_1
-    return state_2
-
-
-def worst_service_state(state_1, state_2):
-    """Return the worst of two service states."""
-    #reduce(lambda g, c: c if g == 0 else (c if c == 2 else (c if (c == 3 and g != 2) else g)), (z.state_id for y in x for z in y.services if z.state_type_id == 1), 0),
-    if state_2 == 0:
-        return state_1
-    if state_1 == 2:
-        return state_1
-    if state_1 == 3 and state_2 != 2:
-        return state_1
-    return state_2
-
-
-
-
 class LiveStatus(object, Hooker):
     """A class that represents the status of all objects in the broker
     
@@ -77,7 +41,7 @@ class LiveStatus(object, Hooker):
     # Use out_map from the mapping.py file
     out_map = out_map
 
-    def __init__(self, configs, hosts, services, contacts, hostgroups, servicegroups, contactgroups, timeperiods, commands, schedulers, pollers, reactionners, brokers, db, pnp_path, return_queue):
+    def __init__(self, configs, hosts, services, contacts, hostgroups, servicegroups, contactgroups, timeperiods, commands, schedulers, pollers, reactionners, brokers, db, use_aggressive_sql, pnp_path, return_queue):
         self.configs = configs
         self.hosts = hosts
         self.services = services
@@ -92,6 +56,7 @@ class LiveStatus(object, Hooker):
         self.reactionners = reactionners
         self.brokers = brokers
         self.db = db
+        self.use_aggressive_sql = use_aggressive_sql
         LiveStatus.pnp_path = pnp_path
         self.debuglevel = 2
         self.return_queue = return_queue
@@ -119,7 +84,7 @@ class LiveStatus(object, Hooker):
         """
         request = LiveStatusRequest(data, self.configs, self.hosts, self.services, 
             self.contacts, self.hostgroups, self.servicegroups, self.contactgroups, self.timeperiods, self.commands, 
-            self.schedulers, self.pollers, self.reactionners, self.brokers, self.db, self.pnp_path, self.return_queue, self.counters)
+            self.schedulers, self.pollers, self.reactionners, self.brokers, self.db, self.use_aggressive_sql, self.pnp_path, self.return_queue, self.counters)
         request.parse_input(data)
         #print "REQUEST\n%s\n" % data
         to_del = []

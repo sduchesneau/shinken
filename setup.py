@@ -55,6 +55,26 @@ from distutils.util import change_root
 from distutils.errors import DistutilsOptionError
 
 
+# We try to see if we are in a full install or an update process
+is_update = False
+if 'update' in sys.argv:
+    print "Shinken Lib Updating process only"
+    sys.argv.remove('update')
+    sys.argv.insert(1, 'install')
+    is_update = True
+
+# If we install/update, for the force option to always overwrite the
+# shinken lib and scripts
+if 'install' in sys.argv and not '-f' in sys.argv:
+    sys.argv.append('-f')
+    
+
+# Utility function to read the README file. This was directly taken from:
+# http://packages.python.org/an_example_pypi_project/setuptools.html
+def read(fname):
+    return open(os.path.join(os.path.dirname(__file__), fname)).read()
+
+
 class build(_build):
     sub_commands = _build.sub_commands + [
         ('build_config', None),
@@ -169,8 +189,11 @@ class build_config(Command):
     def run(self):
         if not self.dry_run:
             self.mkpath(self.build_dir)
-        self.generate_default_shinken_file()
-        self.update_configfiles()
+        # We generate the conf files only for a full install
+        if not is_update:
+            self.generate_default_shinken_file()
+            self.update_configfiles()
+            self.copy_objects_file()
         
     def generate_default_shinken_file(self):
         # The default file must have good values for the directories:
@@ -195,6 +218,19 @@ class build_config(Command):
             f = open(outfile, "w")
             f.write(buf)
             f.close()
+
+    def copy_objects_file(self):
+        for name in config_objects_file:
+            inname = os.path.join('etc', name)
+            outname = os.path.join(self.build_dir, name)
+            log.info('Copying data files in : %s out : %s' % (inname,outname))
+            append_file_with(inname, outname,"")
+        #Creating some needed directories
+        discovery_dir = os.path.join(self.build_dir + "/objects/discovery")
+        for dirname in [self.var_path,self.run_path,self.log_path,discovery_dir]:
+            if not os.path.exists(dirname):
+                os.makedirs(dirname)
+
 
     def update_configfiles(self):
         # Here, even with --root we should change the file with good values
@@ -254,6 +290,7 @@ local_log=%s/arbiterd.log
                                     "%s/nagios.log" % self.log_path)
 
 
+
 class install_config(Command):
     description = "install the shinken config files"
 
@@ -298,6 +335,9 @@ class install_config(Command):
         )
 
     def run(self):
+        # If we are just doing an update, pass this
+        if is_update:
+            return
         #log.warn('>>> %s', self.lib)
         log.warn('>>> %s', self.etc_path)
         if not self.skip_build:
@@ -353,11 +393,16 @@ class install_config(Command):
                                        "Maybe you should create this group"
                                        % group_name)
 
+def ensure_dir_exist(f):
+    dirname = os.path.dirname(f)
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
 
 def append_file_with(infilename, outfilename, append_string):
     f = open(infilename)
     buf = f.read()
     f.close()
+    ensure_dir_exist(outfilename)
     f = open(outfilename, "w")
     f.write(buf)
     f.write(append_string)
@@ -429,6 +474,26 @@ additionnal_config_files = ('shinken-specific.cfg',
                             'shinken-specific-load-balanced-only.cfg'
                             )
 
+config_objects_file = (
+                        'discovery_runs.cfg',
+                        'templates.cfg',
+                        'dependencies.cfg',
+                        'timeperiods.cfg',
+                        'contacts.cfg',
+                        'discovery_rules.cfg',
+                        'hosts/localhost.cfg',
+                        'services/linux_local.cfg',
+                        'contactgroups.cfg',
+                        'escalations.cfg',
+                        'commands.cfg',
+                        'discovery.cfg',
+                        'servicegroups.cfg',
+                        'hostgroups.cfg',
+                        'certs/server.pem',
+                        'certs/client.pem',
+                        'certs/ca.pem'
+)
+
 # daemon configs
 daemon_ini_files = (('broker', 'brokerd.ini'),
                     ('broker', 'brokerd-windows.ini'),
@@ -441,6 +506,8 @@ daemon_ini_files = (('broker', 'brokerd.ini'),
                     ('scheduler', 'schedulerd.ini'),
                     ('scheduler', 'schedulerd-windows.ini'),
                     )
+
+
 
 resource_cfg_files = ('resource.cfg', )
 
@@ -456,6 +523,34 @@ package_data = ['*.py','modules/*.py','modules/*/*.py']
 package_data.extend(webui_files)
 
 
+#By default we add all init.d scripts and some dummy files
+data_files = [
+    (   
+        os.path.join('/etc', 'init.d'),
+        ['bin/init.d/shinken',
+         'bin/init.d/shinken-arbiter',
+         'bin/init.d/shinken-broker',
+         'bin/init.d/shinken-receiver',
+         'bin/init.d/shinken-poller',
+         'bin/init.d/shinken-reactionner',
+         'bin/init.d/shinken-scheduler'
+         ]
+        ),
+    (
+        default_paths['libexec'], ['libexec/check.sh']
+        )
+    ]
+
+
+# If not update, we install configuration files too
+if not is_update:
+                
+    data_files.append(
+        (os.path.join(etc_root, 'default',),
+         ['build/bin/default/shinken' ]
+         ))
+
+    
 print "All package _data"
 if __name__ == "__main__":
     
@@ -472,7 +567,7 @@ if __name__ == "__main__":
         packages = find_packages(),
         package_data = {'' : package_data},
         description = "Shinken is a monitoring tool compatible with Nagios configuration and plugins",
-        long_description=open('README').read(),
+        long_description=read('README'),
         author = "Gabes Jean",
         author_email = "naparuba@gmail.com",
         license = "GNU Affero General Public License",
@@ -496,76 +591,9 @@ if __name__ == "__main__":
         ],
     
         scripts = glob('bin/shinken-[!_]*'),
-        
-        data_files = [
-            (
-                default_paths['etc'],
-                [ # other configs
-                    'etc/commands.cfg',
-                    'etc/contactgroups.cfg',
-                    'etc/contacts.cfg',
-                    'etc/dependencies.cfg',
-                    'etc/escalations.cfg',
-                    'etc/hostgroups.cfg',
-                    #'etc/resource.cfg', # see above
-                    'etc/servicegroups.cfg',
-                    'etc/templates.cfg',
-                    'etc/timeperiods.cfg',
-                    'etc/discovery.cfg',
-                    'etc/discovery_rules.cfg',
-                    'etc/discovery_runs.cfg',
-                ]
-            ),
 
-            ( 
-                os.path.join(default_paths['etc'], 'hosts' ),
-                glob('etc/hosts/[!_]*.cfg')
-            ),
-            (
-                os.path.join(default_paths['etc'], 'services'),
-                glob('etc/services/[!_]*.cfg')
-            ),
-            
-            (   os.path.join(default_paths['etc'], 'objects', 'discovery'), tuple() ), 
-            
-            (   
-                os.path.join(default_paths['etc'], 'certs') ,
-                glob('etc/certs/[!_]*.pem')
-            ),
-            
-            (   
-                os.path.join('/etc', 'init.d'),
-                [
-                    'bin/init.d/shinken',
-                    'bin/init.d/shinken-arbiter',
-                    'bin/init.d/shinken-broker',
-                    'bin/init.d/shinken-receiver',
-                    'bin/init.d/shinken-poller',
-                    'bin/init.d/shinken-reactionner',
-                    'bin/init.d/shinken-scheduler'
-                ]
-            ),
-            
-            (
-                os.path.join(etc_root, 'default',),
-                [   'build/bin/default/shinken' ]
-            ),
-
-            (
-                default_paths['var'], 
-                [ 'var/void_for_git' ]
-            ),
-            (
-                default_paths['run'],
-                [ 'var/void_for_git' ]
-            ),
-            (
-                default_paths['log'],
-                [ 'var/void_for_git' ]
-            )
-            ,
-            (
-                default_paths['libexec'], ['libexec/check.sh']
-            ),
-        ]
+        data_files=data_files,
     )
+
+
+print "Shinken setup done"

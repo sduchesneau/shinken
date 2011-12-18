@@ -62,11 +62,15 @@ def user_auth():
     print "Got forms"
     login = app.request.forms.get('login', '')
     password = app.request.forms.get('password', '')
+    is_mobile = app.request.forms.get('is_mobile', '0')
     is_auth = app.check_auth(login, password)
 
     if is_auth:
         app.response.set_cookie('user', login, secret=app.auth_secret, path='/')
-        redirect("/problems")
+        if is_mobile == '1':
+            redirect("/mobile/main")
+        else:
+            redirect("/problems")
     else:
         redirect("/user/login?error=Invalid user or Password")
 
@@ -81,15 +85,29 @@ def get_root():
         redirect("/problems")
     else:
         redirect("/user/login")
+
+
+
+def login_mobile():
+    user = app.get_user_auth()
+    if user:
+        redirect("/mobile/main")
+
+    err = app.request.GET.get('error', None)
+    login_text = app.login_text
+
+    return {'error': err, 'login_text' : login_text}
         
 
 pages = { user_login : { 'routes' : ['/user/login', '/user/login/'], 
-                         'view' : 'login'},
-          user_login_redirect : { 'routes' : ['/login'] },
+                         'view' : 'login', 'static' : True},
+          user_login_redirect : { 'routes' : ['/login'] , 'static' : True},
           user_auth : { 'routes' : ['/user/auth'], 
                         'view' : 'auth', 
-                        'method' : 'POST'},
-          user_logout : { 'routes' : ['/user/logout', '/logout'] },
-          get_root : {'routes' : ['/']},
+                        'method' : 'POST', 'static' : True},
+          user_logout : { 'routes' : ['/user/logout', '/logout'] , 'static' : True},
+          get_root : {'routes' : ['/'], 'static' : True},
+          login_mobile : {'routes' : ['/mobile', '/mobile/'], 
+                    'view' : 'login_mobile', 'static' : True}
           }
 

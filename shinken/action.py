@@ -27,6 +27,7 @@ import shlex
 import sys
 import subprocess
 
+from shinken.util import safe_print
 __all__ = ( 'Action' )
 
 valid_exit_status = (0, 1, 2, 3)
@@ -74,13 +75,29 @@ class __Action(object):
         elts_line1 = elts[0].split('|')
         # First line before | is output, and strip it
         self.output = elts_line1[0].strip()
+        # Init perfdata as void
+        self.perf_data = ''
         # After | is perfdata, and strip it
         if len(elts_line1) > 1:
             self.perf_data = elts_line1[1].strip()
-        # The others lines are long_output
-        # but others are are not stripped
-        if len(elts) > 1:
-            self.long_output = '\n'.join(elts[1:])
+        # Now manage others lines. Before the | it's long_output
+        # And after it's all perf_data, \n join
+        long_output = []
+        in_perfdata = False
+        for line in elts[1:]:
+            # if already in perfdata, direct append
+            if in_perfdata:
+                self.perf_data += ' ' + line.strip()
+            else: # not already in? search for the | part :)
+                elts = line.split('|', 1)
+                # The first part will always be long_output
+                long_output.append(elts[0].strip())
+                if len(elts) > 1:
+                    in_perfdata = True
+                    self.perf_data += ' ' + elts[1].strip()
+        # long_output is all non output and perfline, join with \n
+        self.long_output = '\n'.join(long_output)
+
 
 
     def check_finished(self, max_plugins_output_length):
@@ -152,10 +169,11 @@ if os.name != 'nt':
             # and if not force shell (if, it's useless, even dangerous)
             # 2.4->2.6 accept just the string command
             if sys.version_info < (2, 7) or force_shell:
-                cmd = self.command                    
+                cmd = self.command.encode('utf8', 'ignore')    
             else:
                 cmd = shlex.split(self.command.encode('utf8', 'ignore'))
-            
+#            safe_print("Launching", cmd)
+#            safe_print("With env", self.local_env)
             # Now : GO for launch!
             try:
                 self.process = subprocess.Popen(cmd,

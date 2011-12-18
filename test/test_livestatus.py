@@ -307,6 +307,8 @@ class TestConfigSmall(TestConfig):
         self.livestatus_broker.db.close()
         if os.path.exists(self.livelogs):
             os.remove(self.livelogs)
+        if os.path.exists(self.livelogs+"-journal"):
+            os.remove(self.livelogs+"-journal")
         if os.path.exists(self.pnp4nagios):
             shutil.rmtree(self.pnp4nagios)
         if os.path.exists('var/nagios.log'):
@@ -1946,6 +1948,43 @@ test_host_0;test_ok_0;CUSTNAME;custvalue
 """)
 
 
+    def test_multisite_hostgroup_alias(self):
+        self.print_header()
+        self.update_broker()
+        a_h0 = self.sched.hosts.find_by_name("test_host_0")
+        a_hg01 = self.sched.hostgroups.find_by_name("hostgroup_01")
+        b_hg01 = self.livestatus_broker.hostgroups["hostgroup_01"]
+        # must have hostgroup_alias_01
+        print a_hg01.hostgroup_name, a_hg01.alias
+        print b_hg01.hostgroup_name, b_hg01.alias
+        self.assert_(a_hg01.hostgroup_name == b_hg01.hostgroup_name)
+        self.assert_(a_hg01.alias == b_hg01.alias)
+        request = """GET hostsbygroup
+Columns: host_name host_alias hostgroup_name hostgroup_alias
+Filter: host_name = test_host_0
+OutputFormat: csv
+"""
+        response, keepalive = self.livestatus_broker.livestatus.handle_request(request)
+        print response
+        self.assert_(response == """test_host_0;up_0;allhosts;All Hosts
+test_host_0;up_0;hostgroup_01;hostgroup_alias_01
+test_host_0;up_0;up;All Up Hosts
+""")
+
+        request = """GET hostsbygroup
+Columns: host_name hostgroup_name host_services_with_state host_services
+Filter: host_name = test_host_0
+OutputFormat: csv
+"""
+        response, keepalive = self.livestatus_broker.livestatus.handle_request(request)
+        print response
+        self.assert_(response == """test_host_0;allhosts;test_ok_0|0|0;test_ok_0
+test_host_0;hostgroup_01;test_ok_0|0|0;test_ok_0
+test_host_0;up;test_ok_0|0|0;test_ok_0
+""")
+
+
+
     def test_multisite_in_check_period(self):
         self.print_header()
         self.update_broker()
@@ -2240,6 +2279,8 @@ class TestConfigBig(TestConfig):
         self.livestatus_broker.db.close()
         if os.path.exists(self.livelogs):
             os.remove(self.livelogs)
+        if os.path.exists(self.livelogs+"-journal"):
+            os.remove(self.livelogs+"-journal")
         if os.path.exists(self.pnp4nagios):
             shutil.rmtree(self.pnp4nagios)
         if os.path.exists('var/nagios.log'):
@@ -2252,6 +2293,85 @@ class TestConfigBig(TestConfig):
         for attr in to_del:
             del self.livestatus_broker.livestatus.__class__.out_map['Host'][attr]
         self.livestatus_broker = None
+
+
+    def test_worst_service_state(self):
+        # test_host_005 is in hostgroup_01
+        # 20 services   from  400 services
+        hostgroup_01 = self.sched.hostgroups.find_by_name("hostgroup_01")
+        host_005 = self.sched.hosts.find_by_name("test_host_005")
+        test_ok_00 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_00")
+        test_ok_01 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_01")
+        test_ok_04 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_04")
+        test_ok_16 = self.sched.services.find_srv_by_name_and_hostname("test_host_005", "test_ok_16")
+        objlist = []
+        for service in [svc for host in hostgroup_01.get_hosts() for svc in host.services]:
+            objlist.append([service, 0, 'OK'])
+        self.scheduler_loop(2, objlist)
+        self.update_broker()
+        #h_request = """GET hosts\nColumns: name num_services_ok num_services_warn num_services_crit num_services_unknown worst_service_state worst_service_hard_state\nFilter: name = test_host_005\nColumnHeaders: on\nResponseHeader: fixed16"""
+        h_request = """GET hosts\nColumns: num_services_warn num_services_crit num_services_unknown worst_service_state worst_service_hard_state\nFilter: name = test_host_005\nColumnHeaders: off\nResponseHeader: off"""
+        #hg_request = """GET hostgroups\nColumns: name num_services_ok num_services_warn num_services_crit num_services_unknown worst_service_state worst_service_hard_state\nFilter: name = hostgroup_01\nColumnHeaders: on\nResponseHeader: fixed16"""
+        hg_request = """GET hostgroups\nColumns: num_services_warn num_services_crit num_services_unknown worst_service_state worst_service_hard_state\nFilter: name = hostgroup_01\nColumnHeaders: off\nResponseHeader: off"""
+
+        # test_ok_00
+        # test_ok_01
+        # test_ok_04
+        # test_ok_16
+        h_response, keepalive = self.livestatus_broker.livestatus.handle_request(h_request)
+        hg_response, keepalive = self.livestatus_broker.livestatus.handle_request(hg_request)
+        self.assert_(h_response == hg_response)
+        self.assert_(h_response == """0;0;0;0;0
+""")
+
+        # test_ok_00
+        # test_ok_01 W(S)
+        # test_ok_04
+        # test_ok_16
+        self.scheduler_loop(1, [[test_ok_01, 1, 'WARN']])
+        self.update_broker()
+        h_response, keepalive = self.livestatus_broker.livestatus.handle_request(h_request)
+        hg_response, keepalive = self.livestatus_broker.livestatus.handle_request(hg_request)
+        self.assert_(h_response == hg_response)
+        self.assert_(h_response == """1;0;0;1;0
+""")
+
+        # test_ok_00
+        # test_ok_01 W(S)
+        # test_ok_04 C(S)
+        # test_ok_16
+        self.scheduler_loop(1, [[test_ok_04, 2, 'CRIT']])
+        self.update_broker()
+        h_response, keepalive = self.livestatus_broker.livestatus.handle_request(h_request)
+        hg_response, keepalive = self.livestatus_broker.livestatus.handle_request(hg_request)
+        self.assert_(h_response == hg_response)
+        self.assert_(h_response == """1;1;0;2;0
+""")
+
+        # test_ok_00
+        # test_ok_01 W(H)
+        # test_ok_04 C(S)
+        # test_ok_16
+        self.scheduler_loop(2, [[test_ok_01, 1, 'WARN']])
+        self.update_broker()
+        h_response, keepalive = self.livestatus_broker.livestatus.handle_request(h_request)
+        hg_response, keepalive = self.livestatus_broker.livestatus.handle_request(hg_request)
+        self.assert_(h_response == hg_response)
+        self.assert_(h_response == """1;1;0;2;1
+""")
+
+        # test_ok_00
+        # test_ok_01 W(H)
+        # test_ok_04 C(H)
+        # test_ok_16
+        self.scheduler_loop(2, [[test_ok_04, 2, 'CRIT']])
+        self.update_broker()
+        h_response, keepalive = self.livestatus_broker.livestatus.handle_request(h_request)
+        hg_response, keepalive = self.livestatus_broker.livestatus.handle_request(hg_request)
+        self.assert_(h_response == hg_response)
+        self.assert_(h_response == """1;1;0;2;2
+""")
+
 
 
     def test_stats(self):
@@ -3166,6 +3286,8 @@ class TestConfigComplex(TestConfig):
         self.livestatus_broker.db.close()
         if os.path.exists(self.livelogs):
             os.remove(self.livelogs)
+        if os.path.exists(self.livelogs+"-journal"):
+            os.remove(self.livelogs+"-journal")
         if os.path.exists(self.pnp4nagios):
             shutil.rmtree(self.pnp4nagios)
         to_del = [attr for attr in self.livestatus_broker.livestatus.__class__.out_map['Host'].keys() if attr.startswith('host_')]
@@ -3234,6 +3356,8 @@ class TestConfigCrazy(TestConfig):
         self.livestatus_broker.db.close()
         if os.path.exists(self.livelogs):
             os.remove(self.livelogs)
+        if os.path.exists(self.livelogs+"-journal"):
+            os.remove(self.livelogs+"-journal")
         if os.path.exists(self.pnp4nagios):
             shutil.rmtree(self.pnp4nagios)
         to_del = [attr for attr in self.livestatus_broker.livestatus.__class__.out_map['Host'].keys() if attr.startswith('host_')]
