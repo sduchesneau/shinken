@@ -229,7 +229,11 @@ class build_config(Command):
         discovery_dir = os.path.join(self.build_dir + "/objects/discovery")
         for dirname in [self.var_path,self.run_path,self.log_path,discovery_dir]:
             if not os.path.exists(dirname):
-                os.makedirs(dirname)
+                try:
+                    #this will fail if we are making a package as non-root user
+                    os.makedirs(dirname)
+                except OSError:
+                    pass
 
 
     def update_configfiles(self):

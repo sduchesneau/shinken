@@ -1,3 +1,12 @@
+shinken (0.8.5-1) unstable; urgency=low
+
+  * 0.8.5 version of shinken
+  * For other things please see
+    https://github.com/naparuba/shinken/blob/master/Changelog
+
+ -- Stéphane Duchesneau <stephane.duchesneau@savoirfairelinux.com>  Sun, 18 Dec 2011 17:36:00 -0500
+
+
 shinken (0.8.1-1) unstable; urgency=low
 
   * 0.8 version of shinken

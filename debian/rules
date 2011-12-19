@@ -80,15 +80,15 @@ binary:
 	# Avoid executable-not-elf-or-script
 	chmod a-x debian/shinken-webui/usr/lib/python2.6/dist-packages/shinken/webui/plugins/eltdetail/htdocs/js/domtab.js
 	
-	dh_python2 -p shinken-core
-	dh_python2 -p shinken-arbiter
-	dh_python2 -p shinken-broker
-	dh_python2 -p shinken-reactionner
-	dh_python2 -p shinken-poller
-	dh_python2 -p shinken-webui
-	dh_python2 -p shinken-discovery
-	dh_python2 -p shinken-receiver
-	dh_python2 -p shinken-scheduler
+	#dh_python2 -V 2.5- -p shinken-core
+	#dh_python2 -V 2.5- -p shinken-arbiter
+	#dh_python2 -V 2.5- -p shinken-broker
+	#dh_python2 -V 2.5- -p shinken-reactionner
+	#dh_python2 -V 2.5- -p shinken-poller
+	#dh_python2 -V 2.5- -p shinken-webui
+	#dh_python2 -V 2.5- -p shinken-discovery
+	#dh_python2 -V 2.5- -p shinken-receiver
+	#dh_python2 -V 2.5- -p shinken-scheduler
 	
 	dh_installdocs
 	dh_installchangelogs
